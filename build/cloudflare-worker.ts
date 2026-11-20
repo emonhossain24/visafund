@@ -9,8 +9,8 @@ export default {fetch(request:Request,env:Cloudflare.Env,ctx:ExecutionContext){
  const safeRequest=new Request(request,{headers});
  return handler.fetch(safeRequest,env,ctx);
 },
- async scheduled(_controller:ScheduledController,env:Cloudflare.Env){
-  const banned=await banInactiveUsers(env.DB);
+ async scheduled(controller:ScheduledController,env:Cloudflare.Env){
+  const banned=controller.cron==='0 3 * * *'?await banInactiveUsers(env.DB):0;
   const cleanup=await cleanupCommunity(env.DB);
   console.log('VisaFund scheduled maintenance finished',{banned,...cleanup});
  }
