@@ -30,6 +30,5 @@ export default async function Page({params,searchParams}:{params:Promise<{slug?:
  if(publicPages.includes(route))return <PublicSite destinations={await activeDestinations()} pages={await publishedPages()} role={role} route={route} signedIn={!!user} rules={['supported-countries','requirements','public-comparison'].includes(route)?await publicRules():[]}/>;
  if(!user)redirect('/login');
  try{await activeMember(user)}catch{return <Registration nativeIdentity={nativeIdentityEnabled()} role={role} mode="register" signedIn name={user.displayName} {...(await restrictedProps(user))} configured={authConfigured()}/>}
- if(route==='banking-feed')return <BankingFeed/>;
  return <App route={route} user={{name:user.displayName,email:user.email,admin:await isProvisionedAdmin(user.userId),profileId:await profileIdForOwner(db(),user.userId)}}/>;
 }
