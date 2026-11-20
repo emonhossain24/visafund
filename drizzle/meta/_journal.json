@@ -57,6 +57,13 @@
       "when": 1793720000000,
       "tag": "0007_profile_ids",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "6",
+      "when": 1795200000000,
+      "tag": "0008_banking_feed",
+      "breakpoints": true
     }
   ]
 }

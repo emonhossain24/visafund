@@ -1,5 +1,6 @@
 import handler from "vinext/server/fetch-handler";
 import {banInactiveUsers} from '../lib/inactivity';
+import {cleanupCommunity} from '../lib/community-cleanup';
 // External requests never carry trusted ChatGPT identity. The Sites dispatcher
 // is absent here: discard its identity headers before the application sees them.
 export default {fetch(request:Request,env:Cloudflare.Env,ctx:ExecutionContext){
@@ -10,6 +11,7 @@ export default {fetch(request:Request,env:Cloudflare.Env,ctx:ExecutionContext){
 },
  async scheduled(_controller:ScheduledController,env:Cloudflare.Env){
   const banned=await banInactiveUsers(env.DB);
-  console.log('VisaFund inactivity cron finished',{banned});
+  const cleanup=await cleanupCommunity(env.DB);
+  console.log('VisaFund scheduled maintenance finished',{banned,...cleanup});
  }
 };
