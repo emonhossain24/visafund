@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { db, identity, HttpError, fail, guard, rateLimit, readJson, now, uid } from '@/lib/server';
+import { profileIdForOwner } from '@/lib/profile-id';
 
 export const dynamic = 'force-dynamic';
 
@@ -86,6 +87,7 @@ async function readPosts(owner: string, options: {
   sort?: string;
   savedOnly?: boolean;
   postId?: string;
+  authorId?: string;
 } = {}) {
   const stamp = now();
   const page = Math.max(1, Math.min(10000, options.page || 1));
@@ -107,6 +109,10 @@ async function readPosts(owner: string, options: {
   if (options.postId) {
     where.push('p.id=?');
     args.push(options.postId);
+  }
+  if (options.authorId) {
+    where.push('p.author_id=?');
+    args.push(options.authorId);
   }
   if (options.query) {
     where.push('(p.body LIKE ? OR u.name LIKE ?)');
@@ -140,6 +146,7 @@ async function readPosts(owner: string, options: {
 export async function GET(request: Request) {
   try {
     const user = await identity();
+    await profileIdForOwner(db(), user.userId);
     await rateLimit(user.userId, 'community-read', 120);
     await ensureCommunityAccess(user.userId);
     const url = new URL(request.url);
@@ -176,15 +183,16 @@ export async function GET(request: Request) {
         ? await db().prepare("SELECT u.id,u.name,pi.id AS profile_id FROM platform_profile_ids pi JOIN platform_users u ON u.id=pi.owner WHERE pi.id=? AND u.status='active'").bind(profileId).first<{id:string;name:string;profile_id:number}>()
         : await db().prepare("SELECT u.id,u.name,pi.id AS profile_id FROM platform_users u JOIN platform_profile_ids pi ON pi.owner=u.id WHERE u.id=? AND u.status='active'").bind(user.userId).first<{id:string;name:string;profile_id:number}>();
       if (!profile) throw new HttpError(404, 'This profile is not available.');
-      const posts = await readPosts(profile.id, { page: 1 });
+      const posts = await readPosts(user.userId, { page: 1, authorId: profile.id });
       const comments = await db().prepare(
-        "SELECT c.id,c.post_id,c.body,c.created_at,c.expires_at,p.body AS post_body," +
-        "u.name AS author_name,pi.id AS author_profile_id " +
+        "SELECT c.id,c.post_id,c.parent_id,c.body,c.created_at,c.expires_at,p.body AS post_body," +
+        "u.name AS author_name,pi.id AS author_profile_id,CASE WHEN c.author_id=? THEN 1 ELSE 0 END AS is_mine " +
         "FROM community_comments c JOIN community_posts p ON p.id=c.post_id " +
         "JOIN platform_users u ON u.id=c.author_id LEFT JOIN platform_profile_ids pi ON pi.owner=c.author_id " +
         "WHERE c.author_id=? AND c.expires_at>? AND p.status='active' AND p.expires_at>? " +
+        "AND (p.group_id IS NULL OR EXISTS (SELECT 1 FROM community_group_members gm JOIN community_groups g ON g.id=gm.group_id WHERE gm.group_id=p.group_id AND gm.user_id=? AND gm.status='active' AND g.status='active')) " +
         "ORDER BY c.created_at DESC LIMIT 20"
-      ).bind(profile.id, now(), now()).all();
+      ).bind(user.userId, profile.id, now(), now(), user.userId).all();
       return json({
         profile: { name: profile.name, profileId: profile.profile_id },
         posts: posts.posts,
@@ -240,6 +248,8 @@ export async function POST(request: Request) {
   try {
     guard(request);
     const user = await identity();
+    await ensureCommunityAccess(user.userId);
+    await profileIdForOwner(db(), user.userId);
     await rateLimit(user.userId, 'community-write', 45);
     const input = writeSchema.parse(await readJson(request, 8000));
     const stamp = now();
@@ -288,8 +298,8 @@ export async function POST(request: Request) {
       const body = safeCommunityText(input.body || '');
       if (body.length > 5000) throw new HttpError(400, 'Posts can contain up to 5,000 characters.');
       const result = await database.prepare(
-        "UPDATE community_posts SET body=?,category=?,updated_at=? WHERE id=? AND author_id=? AND status='active' AND expires_at>?"
-      ).bind(body, input.category || 'General Discussion', stamp, id, user.userId, stamp).run();
+        "UPDATE community_posts SET body=?,category=COALESCE(?,category),updated_at=? WHERE id=? AND author_id=? AND status='active' AND expires_at>?"
+      ).bind(body, input.category || null, stamp, id, user.userId, stamp).run();
       if (!result.meta.changes) throw new HttpError(404, 'Post not found or no longer editable.');
       return json({ ok: true });
     }
@@ -306,8 +316,8 @@ export async function POST(request: Request) {
       const body = safeCommunityText(input.body || '');
       if (body.length > 1500) throw new HttpError(400, 'Comments can contain up to 1,500 characters.');
       const result = await database.prepare(
-        "UPDATE community_comments SET body=?,updated_at=? WHERE id=? AND author_id=? AND expires_at>?"
-      ).bind(body, stamp, id, user.userId, stamp).run();
+        "UPDATE community_comments SET body=?,updated_at=? WHERE id=? AND author_id=? AND expires_at>? AND EXISTS (SELECT 1 FROM community_posts p WHERE p.id=community_comments.post_id AND p.status='active' AND p.expires_at>?)"
+      ).bind(body, stamp, id, user.userId, stamp, stamp).run();
       if (!result.meta.changes) throw new HttpError(404, 'Comment not found or no longer editable.');
       return json({ ok: true });
     }
