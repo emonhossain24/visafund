@@ -823,3 +823,35 @@ body {
  .community-page .community-empty-state{flex-wrap:wrap;gap:5px 12px;padding:13px 15px}
  .community-page .community-empty-state h3,.community-page .community-empty-state p{flex:1 1 100%}
 }
+
+
+/* Community hero: keep the slogan on separate readable lines and gently animate the mark. */
+.community-page .community-hero-note{
+  display:flex;
+  flex-direction:column;
+  align-items:flex-start;
+  gap:4px;
+  min-width:190px;
+  line-height:1.45;
+}
+.community-page .community-hero-note strong{display:block;margin-bottom:2px}
+.community-page .community-hero-note span{display:block;white-space:normal}
+.community-page .community-logo-mark{
+  display:grid;
+  place-items:center;
+  width:100%;
+  height:100%;
+  animation:community-logo-float 3.2s ease-in-out infinite,community-logo-glow 3.2s ease-in-out infinite;
+  transform-origin:center;
+}
+@keyframes community-logo-float{
+  0%,100%{transform:translateY(0) rotate(-7deg) scale(1)}
+  50%{transform:translateY(-7px) rotate(7deg) scale(1.08)}
+}
+@keyframes community-logo-glow{
+  0%,100%{filter:drop-shadow(0 0 2px #b9dcff)}
+  50%{filter:drop-shadow(0 0 12px #b9dcff)}
+}
+@media(prefers-reduced-motion:reduce){
+  .community-page .community-logo-mark{animation:none}
+}
