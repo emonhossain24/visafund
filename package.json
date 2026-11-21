@@ -15,7 +15,8 @@
     "build:cloudflare": "vite build --config vite.cloudflare.config.ts",
     "deploy:cloudflare": "wrangler deploy --config dist/server/wrangler.json",
     "test:auth-policy": "node --experimental-strip-types tests-auth.ts",
-    "test:auth-cloudflare": "node tests-cloudflare-auth.mjs"
+    "test:auth-cloudflare": "node tests-cloudflare-auth.mjs",
+    "test:community": "node --experimental-strip-types tests-community.ts"
   },
   "dependencies": {
     "@base-ui/react": "^1.7.0",
