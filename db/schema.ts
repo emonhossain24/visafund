@@ -47,3 +47,14 @@ export const communityGroupMembers=sqliteTable('community_group_members',{groupI
 export const communityReports=sqliteTable('community_reports',{id:text('id').primaryKey(),reporterId:text('reporter_id').notNull(),postId:text('post_id'),commentId:text('comment_id'),reason:text('reason').notNull(),status:text('status').notNull().default('open'),createdAt:text('created_at').notNull(),reviewedBy:text('reviewed_by'),reviewedAt:text('reviewed_at')},t=>[index('community_reports_status').on(t.status,t.createdAt)]);
 export const communityUserControls=sqliteTable('community_user_controls',{userId:text('user_id').primaryKey(),status:text('status').notNull().default('active'),postingDisabled:integer('posting_disabled').notNull().default(0),commentingDisabled:integer('commenting_disabled').notNull().default(0),reason:text('reason').notNull().default(''),updatedBy:text('updated_by'),updatedAt:text('updated_at').notNull()},t=>[index('community_user_controls_status').on(t.status)]);
 export const communityModerationLogs=sqliteTable('community_moderation_logs',{id:text('id').primaryKey(),actorId:text('actor_id').notNull(),targetUser:text('target_user'),targetRef:text('target_ref'),action:text('action').notNull(),reason:text('reason').notNull().default(''),createdAt:text('created_at').notNull()},t=>[index('community_moderation_logs_created').on(t.createdAt)]);
+
+
+// Admin-managed Banking Hub content. Existing financial and community records are untouched.
+export const bankingHubContent=sqliteTable('banking_hub_content',{
+ id:text('id').primaryKey(),kind:text('kind').notNull(),title:text('title').notNull(),summary:text('summary').notNull().default(''),body:text('body').notNull().default(''),
+ category:text('category').notNull().default(''),country:text('country').notNull().default(''),platform:text('platform').notNull().default(''),
+ meetingUrl:text('meeting_url').notNull().default(''),venue:text('venue').notNull().default(''),startsAt:text('starts_at'),timezone:text('timezone').notNull().default('Asia/Dhaka'),
+ durationMinutes:integer('duration_minutes'),feeAmount:integer('fee_amount'),feeCurrency:text('fee_currency').notNull().default('BDT'),
+ status:text('status').notNull().default('draft'),accessLevel:text('access_level').notNull().default('locked'),sortOrder:integer('sort_order').notNull().default(0),
+ createdBy:text('created_by').notNull(),createdAt:text('created_at').notNull(),updatedAt:text('updated_at').notNull()
+},t=>[index('banking_hub_kind_status').on(t.kind,t.status,t.sortOrder),index('banking_hub_country').on(t.country),index('banking_hub_starts').on(t.startsAt)]);
