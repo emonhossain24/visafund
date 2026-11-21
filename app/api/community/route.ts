@@ -267,14 +267,14 @@ export async function POST(request: Request) {
     const database = db();
 
     if (input.action === 'create-post') {
-      await ensureCommunityAccess(user.userId, 'post');
+      await ensureCommunityAccess(user.userId, 'post', isAdmin);
       const body = safeCommunityText(input.body || '');
       if (body.length > 5000) throw new HttpError(400, 'Posts can contain up to 5,000 characters.');
       if (input.groupId) {
         const member = await database.prepare(
           "SELECT 1 AS ok FROM community_group_members WHERE group_id=? AND user_id=? AND status='active'"
         ).bind(input.groupId, user.userId).first();
-        if (!member) throw new HttpError(403, 'Join the community before posting there.');
+        if (!member && !isAdmin) throw new HttpError(403, 'Join the community before posting there.');
       }
       const id = uid();
       const expires = isAdmin ? '9999-12-31T23:59:59.999Z' : new Date(Date.parse(stamp) + 72 * 60 * 60 * 1000).toISOString();
@@ -285,7 +285,7 @@ export async function POST(request: Request) {
     }
 
     if (input.action === 'create-comment') {
-      await ensureCommunityAccess(user.userId, 'comment');
+      await ensureCommunityAccess(user.userId, 'comment', isAdmin);
       const postId = z.string().uuid().parse(input.postId);
       const post = await assertPostVisible(postId, user.userId, isAdmin);
       const body = safeCommunityText(input.body || '');
@@ -309,8 +309,8 @@ export async function POST(request: Request) {
       const body = safeCommunityText(input.body || '');
       if (body.length > 5000) throw new HttpError(400, 'Posts can contain up to 5,000 characters.');
       const result = await database.prepare(
-        "UPDATE community_posts SET body=?,category=COALESCE(?,category),updated_at=? WHERE id=? AND (author_id=? OR ?=1) AND status='active' AND (expires_at>? OR ?=1)"
-      ).bind(body, input.category || null, stamp, id, user.userId, isAdmin ? 1 : 0, stamp, isAdmin ? 1 : 0).run();
+        "UPDATE community_posts SET body=?,category=COALESCE(?,category),updated_at=? WHERE id=? AND (author_id=? OR ?=1) AND (?=1 OR status='active') AND (expires_at>? OR ?=1)"
+      ).bind(body, input.category || null, stamp, id, user.userId, isAdmin ? 1 : 0, isAdmin ? 1 : 0, stamp, isAdmin ? 1 : 0).run();
       if (!result.meta.changes) throw new HttpError(404, 'Post not found or no longer editable.');
       return json({ ok: true });
     }
@@ -327,8 +327,8 @@ export async function POST(request: Request) {
       const body = safeCommunityText(input.body || '');
       if (body.length > 1500) throw new HttpError(400, 'Comments can contain up to 1,500 characters.');
       const result = await database.prepare(
-        "UPDATE community_comments SET body=?,updated_at=? WHERE id=? AND (author_id=? OR ?=1) AND (expires_at>? OR ?=1) AND EXISTS (SELECT 1 FROM community_posts p WHERE p.id=community_comments.post_id AND p.status='active' AND (p.expires_at>? OR ?=1))"
-      ).bind(body, stamp, id, user.userId, isAdmin ? 1 : 0, stamp, isAdmin ? 1 : 0, stamp, isAdmin ? 1 : 0).run();
+        "UPDATE community_comments SET body=?,updated_at=? WHERE id=? AND (author_id=? OR ?=1) AND (expires_at>? OR ?=1) AND EXISTS (SELECT 1 FROM community_posts p WHERE p.id=community_comments.post_id AND (?=1 OR p.status='active') AND (p.expires_at>? OR ?=1))"
+      ).bind(body, stamp, id, user.userId, isAdmin ? 1 : 0, stamp, isAdmin ? 1 : 0, isAdmin ? 1 : 0, stamp, isAdmin ? 1 : 0).run();
       if (!result.meta.changes) throw new HttpError(404, 'Comment not found or no longer editable.');
       return json({ ok: true });
     }
@@ -359,7 +359,7 @@ export async function POST(request: Request) {
 
     if (input.action === 'save' || input.action === 'unsave') {
       const postId = z.string().uuid().parse(input.postId);
-      await assertPostVisible(postId, user.userId);
+      await assertPostVisible(postId, user.userId, isAdmin);
       if (input.action === 'save') {
         await database.prepare('INSERT OR IGNORE INTO community_saved_posts(user_id,post_id,created_at) VALUES(?,?,?)').bind(user.userId, postId, stamp).run();
       } else {
@@ -389,7 +389,7 @@ export async function POST(request: Request) {
       const postId = input.postId ? z.string().uuid().parse(input.postId) : null;
       const commentId = input.commentId ? z.string().uuid().parse(input.commentId) : null;
       if (!!postId === !!commentId) throw new HttpError(400, 'Report one post or one comment.');
-      if (postId) await assertPostVisible(postId, user.userId);
+      if (postId) await assertPostVisible(postId, user.userId, isAdmin);
       if (commentId) {
         const comment = await database.prepare(
           "SELECT c.post_id FROM community_comments c WHERE c.id=? AND (?=1 OR c.expires_at>?)"
