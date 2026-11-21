@@ -28,5 +28,5 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm test:community
       - run: pnpm exec tsc --noEmit
-      - run: pnpm exec eslint app/banking-feed.tsx app/community-admin.tsx app/admin-site.tsx app/api/community/route.ts app/api/community-admin/route.ts lib/community-admin-service.ts lib/community-cleanup.ts build/cloudflare-worker.ts tests-community.ts tests-auth.ts
+      - run: pnpm exec eslint app/banking-feed.tsx app/community-admin.tsx app/banking-hub-admin.tsx app/admin-site.tsx app/api/community/route.ts app/api/community-admin/route.ts app/api/banking-hub/route.ts lib/community-admin-service.ts lib/community-cleanup.ts build/cloudflare-worker.ts tests-community.ts tests-auth.ts
       - run: pnpm build:cloudflare

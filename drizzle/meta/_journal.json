@@ -64,6 +64,13 @@
       "when": 1795200000000,
       "tag": "0008_banking_feed",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "6",
+      "when": 1795266000000,
+      "tag": "0009_banking_hub_content",
+      "breakpoints": true
     }
   ]
 }
