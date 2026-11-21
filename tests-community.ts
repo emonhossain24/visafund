@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import {readFile,readdir} from 'node:fs/promises';
+import {readFile} from 'node:fs/promises';
 import {pathToFileURL} from 'node:url';
 import {createRequire} from 'node:module';
 import {cleanupCommunity} from './lib/community-cleanup.ts';
