@@ -49,7 +49,7 @@ assert.equal((await db.prepare("SELECT COUNT(*) AS n FROM platform_audit WHERE a
 assert.equal((await db.prepare("SELECT owner FROM accounts WHERE id='existing'").first<{owner:string}>())?.owner,'legacy-owner');checks++;
 assert.equal(await wasAutomaticallyBanned(db,'idle-user'),true);checks++;
 const bannedListing=await readPlatform(db,'users','','banned');
-assert.equal((bannedListing.users.find(r=>r.id==='idle-user') as {ban_reason?:string}|undefined)?.ban_reason,'30-day inactivity');checks++;
+assert.equal(('users' in bannedListing ? bannedListing.users.find((r:{id:string;ban_reason?:string})=>r.id==='idle-user')?.ban_reason : undefined),'30-day inactivity');checks++;
 const recovered=await moderateAccount(db,'trusted-admin',{action:'unban',target:'idle-user',reason:'Admin reviewed and approved recovery from inactivity'},[]);
 assert.equal(recovered.status,'active');checks++;
 const unbanned=await db.prepare("SELECT status,last_seen FROM platform_users WHERE id='idle-user'").first<{status:string;last_seen:string}>();
