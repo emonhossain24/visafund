@@ -3,7 +3,7 @@ import {useCallback,useEffect,useMemo,useState} from 'react';
 
 type Group={id:string;name:string;description:string;member_count:number;membership_status:string|null};
 type Post={id:string;author_name:string;author_profile_id:number|null;category:string;body:string;created_at:string;expires_at:string;group_id:string|null;group_name:string|null;comment_count:number;like_count:number;helpful_count:number;my_reaction:'like'|'helpful'|null;saved:number;is_mine:number};
-type Comment={id:string;post_id:string;parent_id:string|null;body:string;author_name:string;author_profile_id:number|null;created_at:string;expires_at:string;is_mine:number};
+type Comment={id:string;post_id:string;parent_id:string|null;body:string;post_body?:string;author_name:string;author_profile_id:number|null;created_at:string;expires_at:string;is_mine:number};
 type Profile={name:string;profileId:number};
 type View='feed'|'saved'|'profile';
 const categories=['Bank Account','Bank Statement','Bank Solvency','Bank Transactions','Education Loan','FDR / DPS','Financial Documents','Bank Issues','General Discussion'];
