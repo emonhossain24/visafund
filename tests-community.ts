@@ -15,6 +15,19 @@ try{
  await db.prepare("CREATE TABLE platform_users(id TEXT PRIMARY KEY,name TEXT NOT NULL,email TEXT NOT NULL,status TEXT NOT NULL,created TEXT NOT NULL,last_seen TEXT NOT NULL,preferences TEXT NOT NULL)").run();
  const migration=await readFile('drizzle/0008_banking_feed.sql','utf8');
  for(const statement of migration.split(';').map(s=>s.trim()).filter(Boolean))await db.prepare(statement).run();
+ const hubMigration=await readFile('drizzle/0009_banking_hub_content.sql','utf8');
+ for(const statement of hubMigration.split(';').map(s=>s.trim()).filter(Boolean))await db.prepare(statement).run();
+ const hubId=crypto.randomUUID(),hubStamp=new Date().toISOString();
+ await db.prepare("INSERT INTO banking_hub_content(id,kind,title,summary,body,category,country,platform,meeting_url,venue,starts_at,timezone,duration_minutes,fee_amount,fee_currency,status,access_level,sort_order,created_by,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)")
+  .bind(hubId,'event','Student workshop','Open workshop','Event details','IELTS','','Google Meet','https://meet.google.com/example','Online',new Date(Date.now()+86400000).toISOString(),'Asia/Dhaka',60,null,'BDT','published','public',0,'admin',hubStamp,hubStamp).run();
+ const publicEvent=await db.prepare("SELECT title,platform,status,access_level FROM banking_hub_content WHERE id=?").bind(hubId).first<{title:string;platform:string;status:string;access_level:string}>();
+ ok(publicEvent?.title==='Student workshop'&&publicEvent.platform==='Google Meet'&&publicEvent.status==='published'&&publicEvent.access_level==='public');
+ await db.prepare("UPDATE banking_hub_content SET title=?,status='draft',updated_at=? WHERE id=?").bind('Updated workshop',new Date().toISOString(),hubId).run();
+ const updatedEvent=await db.prepare("SELECT title,status FROM banking_hub_content WHERE id=?").bind(hubId).first<{title:string;status:string}>();
+ ok(updatedEvent?.title==='Updated workshop'&&updatedEvent.status==='draft');
+ await db.prepare("DELETE FROM banking_hub_content WHERE id=?").bind(hubId).run();
+ ok(!(await db.prepare("SELECT id FROM banking_hub_content WHERE id=?").bind(hubId).first()));
+
  for(const id of ['author','reader'])await db.prepare("INSERT INTO platform_users(id,name,email,status,created,last_seen,preferences) VALUES(?,?,?,'active',?,?, '{}')").bind(id,id,id+'@example.test',new Date().toISOString(),new Date().toISOString()).run();
  const stamp=new Date().toISOString(),past=new Date(Date.now()-25*3600000).toISOString(),future=new Date(Date.now()+24*3600000).toISOString();
  const post=crypto.randomUUID(),expiredPost=crypto.randomUUID();
