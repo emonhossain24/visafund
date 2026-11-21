@@ -168,8 +168,8 @@ export async function GET(request: Request) {
         "SELECT g.id,g.slug,g.name,g.description,g.join_mode,g.status," +
         "(SELECT COUNT(*) FROM community_group_members m WHERE m.group_id=g.id AND m.status='active') AS member_count," +
         "(SELECT m.status FROM community_group_members m WHERE m.group_id=g.id AND m.user_id=? LIMIT 1) AS membership_status " +
-        "FROM community_groups g WHERE g.status='active' ORDER BY g.name"
-      ).bind(user.userId).all();
+        "FROM community_groups g WHERE (?=1 OR g.status='active') ORDER BY g.name"
+      ).bind(isAdmin ? 1 : 0, user.userId).all();
       return json({ groups: result.results });
     }
 
@@ -199,10 +199,10 @@ export async function GET(request: Request) {
         "u.name AS author_name,pi.id AS author_profile_id,CASE WHEN c.author_id=? THEN 1 ELSE 0 END AS is_mine " +
         "FROM community_comments c JOIN community_posts p ON p.id=c.post_id " +
         "JOIN platform_users u ON u.id=c.author_id LEFT JOIN platform_profile_ids pi ON pi.owner=c.author_id " +
-        "WHERE c.author_id=? AND (?=1 OR c.expires_at>?) AND p.status='active' AND (?=1 OR p.expires_at>?) " +
+        "WHERE c.author_id=? AND (?=1 OR c.expires_at>?) AND (?=1 OR p.status='active') AND (?=1 OR p.expires_at>?) " +
         "AND (?=1 OR p.group_id IS NULL OR EXISTS (SELECT 1 FROM community_group_members gm JOIN community_groups g ON g.id=gm.group_id WHERE gm.group_id=p.group_id AND gm.user_id=? AND gm.status='active' AND g.status='active')) " +
         "ORDER BY c.created_at DESC LIMIT 20"
-      ).bind(user.userId, isAdmin ? 1 : 0, now(), isAdmin ? 1 : 0, now(), isAdmin ? 1 : 0, user.userId).all();
+      ).bind(user.userId, isAdmin ? 1 : 0, now(), isAdmin ? 1 : 0, isAdmin ? 1 : 0, now(), isAdmin ? 1 : 0, user.userId).all();
       return json({
         profile: { name: profile.name, profileId: profile.profile_id },
         posts: posts.posts,
