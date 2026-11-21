@@ -99,10 +99,9 @@ async function readPosts(owner: string, options: {
   const stamp = now();
   const page = Math.max(1, Math.min(10000, options.page || 1));
   const limit = 20;
-  const where: string[] = [];
+  const where: string[] = options.isAdmin ? ['1=1'] : ["p.status='active'"];
   const args: unknown[] = [];
   if (!options.isAdmin) {
-    where.push("p.status='active'");
     where.push('p.expires_at>?'); args.push(stamp);
     where.push("(p.group_id IS NULL OR EXISTS (SELECT 1 FROM community_group_members gm JOIN community_groups gx ON gx.id=gm.group_id WHERE gm.group_id=p.group_id AND gm.user_id=? AND gm.status='active' AND gx.status='active'))'); args.push(owner);
   }
