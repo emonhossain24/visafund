@@ -770,3 +770,24 @@ body {
 .community-page .hub-country-flag{font-size:27px}
 @media(max-width:850px){.community-page .hub-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:600px){.community-page .hub-grid,.community-page .hub-roadmap,.community-page .hub-premium-top{grid-template-columns:1fr}.community-page .hub-card{min-height:0}.community-page .community-hub-panel{padding:18px}}
+
+
+/* Banking Hub admin and locked-access states */
+.banking-hub-admin{color:#eaf2fc;background:#14263b;border:1px solid #385574}
+.banking-hub-admin>h2,.banking-hub-admin h3{color:#f3f7ff}
+.banking-hub-admin>p{color:#bfd0e4;line-height:1.7}
+.banking-hub-form{display:grid;gap:14px;margin:20px 0;padding:20px;border:1px solid #3c5a79;border-radius:14px;background:#192f48}
+.banking-hub-form label{display:grid;gap:6px;color:#d8e6f5;font-size:13px;font-weight:650}
+.banking-hub-form input,.banking-hub-form textarea,.banking-hub-form select{width:100%;padding:10px 12px;border:1px solid #466486;border-radius:9px;background:#102239;color:#f2f7ff}
+.banking-hub-form-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.banking-hub-admin-actions,.community-admin-actions{display:flex;flex-wrap:wrap;gap:8px}
+.banking-hub-admin .admin-table-scroll{overflow-x:auto}
+.banking-hub-admin table{width:100%;border-collapse:collapse}
+.banking-hub-admin th,.banking-hub-admin td{padding:10px;border-bottom:1px solid #385574;text-align:left;color:#d7e4f3;vertical-align:top}
+.banking-hub-admin th{color:#a9d2ff}
+.community-page .hub-locked{display:grid;justify-items:center;gap:9px;margin:28px auto;padding:34px 20px;max-width:520px;border:1px solid #49698d;border-radius:15px;background:#1b3550;text-align:center}
+.community-page .hub-locked>span{font-size:28px;color:#a8d4ff}
+.community-page .hub-locked strong{font-size:18px;color:#f2f7ff}
+.community-page .hub-locked p{margin:0;color:#c0d2e6;line-height:1.7}
+.community-page .hub-event-link{margin-top:10px;color:#91caff;font-size:12px;font-weight:750}
+@media(max-width:620px){.banking-hub-form-grid{grid-template-columns:1fr}.banking-hub-form{padding:14px}}
