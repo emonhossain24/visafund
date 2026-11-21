@@ -18,8 +18,14 @@ export default function BankingFeed(){
  const load=useCallback(async(reset=true)=>{try{setError('');const p=reset?1:page+1;const q=new URLSearchParams({mode:view==='saved'?'saved':'feed',page:String(p),sort});if(activeGroup&&view==='feed')q.set('groupId',activeGroup);if(query&&view==='feed')q.set('q',query);if(categoryFilter&&view==='feed')q.set('category',categoryFilter);const b=await api('/api/community?'+q);setPosts(old=>reset?b.posts:[...old,...b.posts]);setHasMore(b.hasMore);setPage(p)}catch(e){setError((e as Error).message)}},[activeGroup,sort,query,page,view,categoryFilter]);
  const loadGroups=useCallback(async()=>{try{const b=await api('/api/community?mode=groups');setGroups(b.groups)}catch(e){setError((e as Error).message)}},[]);
  const loadProfile=useCallback(async()=>{try{const q=new URLSearchParams({mode:'profile'});if(profileId)q.set('profileId',profileId);const b=await api('/api/community?'+q);setProfile(b.profile);setPosts(b.posts);setProfileComments(b.comments)}catch(e){setError((e as Error).message)}},[profileId]);
+ // URL query parameters are external navigation state; hydrate them once after mount.
+ // eslint-disable-next-line react-hooks/set-state-in-effect
  useEffect(()=>{const params=new URLSearchParams(window.location.search);const target=params.get('post');if(target){void api('/api/community?mode=post&id='+encodeURIComponent(target)).then(b=>setPosts(b.posts)).catch(e=>setError(e.message));}else if(params.get('view')==='saved')setView('saved');else if(params.get('view')==='profile'){setView('profile');setProfileId(params.get('profileId')||'')}},[]);
+ // The initial community list is fetched from the authenticated API after mount.
+ // eslint-disable-next-line react-hooks/set-state-in-effect
  useEffect(()=>{void loadGroups()},[loadGroups]);
+ // Feed/profile views synchronize with their respective server-backed data sources.
+ // eslint-disable-next-line react-hooks/set-state-in-effect
  useEffect(()=>{if(view==='profile')void loadProfile();else void load()},[view,load,loadProfile]);
  async function write(data:unknown){setBusy(true);try{await api('/api/community','POST',data);if(view==='profile')await loadProfile();else await load();await loadGroups()}catch(e){setError((e as Error).message)}finally{setBusy(false)}}
  async function toggleComments(postId:string){if(comments[postId]){setComments(old=>({...old,[postId]:[]}));return}try{const b=await api('/api/community?mode=comments&postId='+postId);setComments(old=>({...old,[postId]:b.comments}))}catch(e){setError((e as Error).message)}}
