@@ -7,7 +7,7 @@ type Comment={id:string;post_id:string;parent_id:string|null;body:string;post_bo
 type Profile={name:string;profileId:number};
 type View='feed'|'saved'|'profile';
 type ApiResult={error?:string;posts:Post[];groups:Group[];hasMore:boolean;profile:Profile;comments:Comment[];ok?:boolean};
-const categories=['Bank Account','Bank Statement','Bank Solvency','Bank Transactions','Education Loan','FDR / DPS','Financial Documents','Bank Issues','General Discussion'];
+const categories=['Bank Account','Bank Statement','Bank Solvency','Bank Transactions','Education Loan','FDR / DPS','Financial Documents','Bank Issues','General Discussion','Student Questions','University & Visa Discussions','Scholarships','Success Stories'];
 const timeLeft=(value:string)=>{const n=Date.parse(value)-Date.now();if(n<=0)return 'Expired';const h=Math.floor(n/3600000);return h>=24?Math.floor(h/24)+'d left':Math.max(1,h)+'h left'};
 export default function BankingFeed(){
  const [posts,setPosts]=useState<Post[]>([]),[groups,setGroups]=useState<Group[]>([]),[comments,setComments]=useState<Record<string,Comment[]>>({});
