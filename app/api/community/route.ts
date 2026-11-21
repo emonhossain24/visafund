@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { db, identity, HttpError, fail, guard, rateLimit, readJson, now, uid } from '@/lib/server';
 import { profileIdForOwner } from '@/lib/profile-id';
+import { isProvisionedAdmin, requireAdminMFA } from '@/lib/platform';
 
 export const dynamic = 'force-dynamic';
 
@@ -49,7 +50,8 @@ async function communityControl(owner: string) {
   ).bind(owner).first<{status:string;posting_disabled:number;commenting_disabled:number;reason:string}>();
 }
 
-async function ensureCommunityAccess(owner: string, action?: 'post' | 'comment') {
+async function ensureCommunityAccess(owner: string, action?: 'post' | 'comment', isAdmin = false) {
+  if (isAdmin) return;
   const control = await communityControl(owner);
   if (control && control.status !== 'active') {
     throw new HttpError(403, control.status === 'banned' ? 'Your Banking Feed access is banned.' : 'Your Banking Feed access is suspended.');
@@ -69,12 +71,12 @@ function safeCommunityText(value: string) {
   return text;
 }
 
-async function assertPostVisible(postId: string, owner: string) {
+async function assertPostVisible(postId: string, owner: string, isAdmin = false) {
   const post = await db().prepare(
-    "SELECT id,group_id FROM community_posts WHERE id=? AND status='active' AND expires_at>?"
-  ).bind(postId, now()).first<{id:string;group_id:string|null}>();
+    "SELECT id,group_id FROM community_posts WHERE id=? AND status='active'" + (isAdmin ? '' : ' AND expires_at>?')
+  ).bind(...(isAdmin ? [postId] : [postId, now()])).first<{id:string;group_id:string|null}>();
   if (!post) throw new HttpError(404, 'This post is no longer available.');
-  if (post.group_id) {
+  if (post.group_id && !isAdmin) {
     const membership = await db().prepare(
       "SELECT 1 AS ok FROM community_group_members gm JOIN community_groups g ON g.id=gm.group_id WHERE gm.group_id=? AND gm.user_id=? AND gm.status='active' AND g.status='active'"
     ).bind(post.group_id, owner).first();
@@ -92,16 +94,17 @@ async function readPosts(owner: string, options: {
   savedOnly?: boolean;
   postId?: string;
   authorId?: string;
+  isAdmin?: boolean;
 } = {}) {
   const stamp = now();
   const page = Math.max(1, Math.min(10000, options.page || 1));
   const limit = 20;
-  const where = [
-    "p.status='active'",
-    'p.expires_at>?',
-    "(p.group_id IS NULL OR EXISTS (SELECT 1 FROM community_group_members gm JOIN community_groups gx ON gx.id=gm.group_id WHERE gm.group_id=p.group_id AND gm.user_id=? AND gm.status='active' AND gx.status='active'))",
-  ];
-  const args: unknown[] = [stamp, owner];
+  const where = ["p.status='active'"];
+  const args: unknown[] = [];
+  if (!options.isAdmin) {
+    where.push('p.expires_at>?'); args.push(stamp);
+    where.push("(p.group_id IS NULL OR EXISTS (SELECT 1 FROM community_group_members gm JOIN community_groups gx ON gx.id=gm.group_id WHERE gm.group_id=p.group_id AND gm.user_id=? AND gm.status='active' AND gx.status='active'))'); args.push(owner);
+  }
   if (options.groupId) {
     where.push('p.group_id=?');
     args.push(options.groupId);
@@ -132,7 +135,7 @@ async function readPosts(owner: string, options: {
   const rows = await db().prepare(
     "SELECT p.id,p.category,p.body,p.status,p.created_at,p.updated_at,p.expires_at,p.group_id," +
     "u.name AS author_name,pi.id AS author_profile_id,g.name AS group_name," +
-    "(SELECT COUNT(*) FROM community_comments c WHERE c.post_id=p.id AND c.expires_at>?) AS comment_count," +
+    "(SELECT COUNT(*) FROM community_comments c WHERE c.post_id=p.id AND (?=1 OR c.expires_at>?)) AS comment_count," +
     "(SELECT COUNT(*) FROM community_reactions r WHERE r.post_id=p.id AND r.reaction_type='like') AS like_count," +
     "(SELECT COUNT(*) FROM community_reactions r WHERE r.post_id=p.id AND r.reaction_type='helpful') AS helpful_count," +
     "(SELECT r.reaction_type FROM community_reactions r WHERE r.post_id=p.id AND r.user_id=? LIMIT 1) AS my_reaction," +
@@ -142,7 +145,7 @@ async function readPosts(owner: string, options: {
     "LEFT JOIN platform_profile_ids pi ON pi.owner=p.author_id " +
     "LEFT JOIN community_groups g ON g.id=p.group_id WHERE " + where.join(' AND ') +
     " ORDER BY " + order + ' LIMIT ? OFFSET ?'
-  ).bind(stamp, owner, owner, owner, ...args, limit + 1, (page - 1) * limit).all<PostRow>();
+  ).bind(options.isAdmin ? 1 : 0, stamp, owner, owner, owner, ...args, limit + 1, (page - 1) * limit).all<PostRow>();
   const items = rows.results.slice(0, limit);
   return { posts: items, page, hasMore: rows.results.length > limit };
 }
@@ -152,7 +155,9 @@ export async function GET(request: Request) {
     const user = await identity();
     await profileIdForOwner(db(), user.userId);
     await rateLimit(user.userId, 'community-read', 120);
-    await ensureCommunityAccess(user.userId);
+    const isAdmin = await isProvisionedAdmin(user.userId);
+    if (isAdmin) await requireAdminMFA();
+    await ensureCommunityAccess(user.userId, undefined, isAdmin);
     const url = new URL(request.url);
     const params = url.searchParams;
     const mode = params.get('mode') || 'feed';
@@ -169,14 +174,14 @@ export async function GET(request: Request) {
 
     if (mode === 'comments') {
       const postId = z.string().uuid().parse(params.get('postId'));
-      await assertPostVisible(postId, user.userId);
+      await assertPostVisible(postId, user.userId, isAdmin);
       const comments = await db().prepare(
         "SELECT c.id,c.post_id,c.parent_id,c.body,c.created_at,c.updated_at,c.expires_at," +
         "u.name AS author_name,pi.id AS author_profile_id,CASE WHEN c.author_id=? THEN 1 ELSE 0 END AS is_mine " +
         "FROM community_comments c JOIN platform_users u ON u.id=c.author_id " +
         "LEFT JOIN platform_profile_ids pi ON pi.owner=c.author_id " +
-        "WHERE c.post_id=? AND c.expires_at>? ORDER BY c.created_at ASC LIMIT 100"
-      ).bind(user.userId, postId, now()).all();
+        "WHERE c.post_id=? AND (?=1 OR c.expires_at>?) ORDER BY c.created_at ASC LIMIT 100"
+      ).bind(user.userId, postId, isAdmin ? 1 : 0, now()).all();
       return json({ comments: comments.results });
     }
 
@@ -187,16 +192,16 @@ export async function GET(request: Request) {
         ? await db().prepare("SELECT u.id,u.name,pi.id AS profile_id FROM platform_profile_ids pi JOIN platform_users u ON u.id=pi.owner WHERE pi.id=? AND u.status='active'").bind(profileId).first<{id:string;name:string;profile_id:number}>()
         : await db().prepare("SELECT u.id,u.name,pi.id AS profile_id FROM platform_users u JOIN platform_profile_ids pi ON pi.owner=u.id WHERE u.id=? AND u.status='active'").bind(user.userId).first<{id:string;name:string;profile_id:number}>();
       if (!profile) throw new HttpError(404, 'This profile is not available.');
-      const posts = await readPosts(user.userId, { page: 1, authorId: profile.id });
+      const posts = await readPosts(user.userId, { page: 1, authorId: profile.id, isAdmin });
       const comments = await db().prepare(
         "SELECT c.id,c.post_id,c.parent_id,c.body,c.created_at,c.expires_at,p.body AS post_body," +
         "u.name AS author_name,pi.id AS author_profile_id,CASE WHEN c.author_id=? THEN 1 ELSE 0 END AS is_mine " +
         "FROM community_comments c JOIN community_posts p ON p.id=c.post_id " +
         "JOIN platform_users u ON u.id=c.author_id LEFT JOIN platform_profile_ids pi ON pi.owner=c.author_id " +
-        "WHERE c.author_id=? AND c.expires_at>? AND p.status='active' AND p.expires_at>? " +
-        "AND (p.group_id IS NULL OR EXISTS (SELECT 1 FROM community_group_members gm JOIN community_groups g ON g.id=gm.group_id WHERE gm.group_id=p.group_id AND gm.user_id=? AND gm.status='active' AND g.status='active')) " +
+        "WHERE c.author_id=? AND (?=1 OR c.expires_at>?) AND p.status='active' AND (?=1 OR p.expires_at>?) " +
+        "AND (?=1 OR p.group_id IS NULL OR EXISTS (SELECT 1 FROM community_group_members gm JOIN community_groups g ON g.id=gm.group_id WHERE gm.group_id=p.group_id AND gm.user_id=? AND gm.status='active' AND g.status='active')) " +
         "ORDER BY c.created_at DESC LIMIT 20"
-      ).bind(user.userId, profile.id, now(), now(), user.userId).all();
+      ).bind(user.userId, isAdmin ? 1 : 0, now(), isAdmin ? 1 : 0, now(), isAdmin ? 1 : 0, user.userId).all();
       return json({
         profile: { name: profile.name, profileId: profile.profile_id },
         posts: posts.posts,
@@ -205,13 +210,13 @@ export async function GET(request: Request) {
     }
 
     if (mode === 'saved') {
-      return json(await readPosts(user.userId, { page: Number(params.get('page') || 1), savedOnly: true }));
+      return json(await readPosts(user.userId, { page: Number(params.get('page') || 1), savedOnly: true, isAdmin }));
     }
 
     if (mode === 'post') {
       const postId = z.string().uuid().parse(params.get('id'));
-      await assertPostVisible(postId, user.userId);
-      return json(await readPosts(user.userId, { postId }));
+      await assertPostVisible(postId, user.userId, isAdmin);
+      return json(await readPosts(user.userId, { postId, isAdmin }));
     }
 
     if (mode !== 'feed') throw new HttpError(400, 'Unsupported Banking Feed request.');
@@ -252,7 +257,9 @@ export async function POST(request: Request) {
   try {
     guard(request);
     const user = await identity();
-    await ensureCommunityAccess(user.userId);
+    const isAdmin = await isProvisionedAdmin(user.userId);
+    if (isAdmin) await requireAdminMFA();
+    await ensureCommunityAccess(user.userId, undefined, isAdmin);
     await profileIdForOwner(db(), user.userId);
     await rateLimit(user.userId, 'community-write', 45);
     const input = writeSchema.parse(await readJson(request, 8000));
@@ -270,7 +277,7 @@ export async function POST(request: Request) {
         if (!member) throw new HttpError(403, 'Join the community before posting there.');
       }
       const id = uid();
-      const expires = new Date(Date.parse(stamp) + 72 * 60 * 60 * 1000).toISOString();
+      const expires = isAdmin ? '9999-12-31T23:59:59.999Z' : new Date(Date.parse(stamp) + 72 * 60 * 60 * 1000).toISOString();
       await database.prepare(
         "INSERT INTO community_posts(id,author_id,group_id,category,body,status,created_at,updated_at,expires_at) VALUES(?,?,?,?,?,'active',?,?,?)"
       ).bind(id, user.userId, input.groupId || null, input.category || 'General Discussion', body, stamp, stamp, expires).run();
@@ -280,7 +287,7 @@ export async function POST(request: Request) {
     if (input.action === 'create-comment') {
       await ensureCommunityAccess(user.userId, 'comment');
       const postId = z.string().uuid().parse(input.postId);
-      const post = await assertPostVisible(postId, user.userId);
+      const post = await assertPostVisible(postId, user.userId, isAdmin);
       const body = safeCommunityText(input.body || '');
       if (body.length > 1500) throw new HttpError(400, 'Comments can contain up to 1,500 characters.');
       if (input.parentId) {
@@ -290,7 +297,7 @@ export async function POST(request: Request) {
         if (!parent) throw new HttpError(404, 'The comment you are replying to is no longer available.');
       }
       const id = uid();
-      const expires = new Date(Date.parse(stamp) + 24 * 60 * 60 * 1000).toISOString();
+      const expires = isAdmin ? '9999-12-31T23:59:59.999Z' : new Date(Date.parse(stamp) + 24 * 60 * 60 * 1000).toISOString();
       await database.prepare(
         "INSERT INTO community_comments(id,post_id,author_id,parent_id,body,created_at,updated_at,expires_at) VALUES(?,?,?,?,?,?,?,?)"
       ).bind(id, postId, user.userId, input.parentId || null, body, stamp, stamp, expires).run();
@@ -302,15 +309,15 @@ export async function POST(request: Request) {
       const body = safeCommunityText(input.body || '');
       if (body.length > 5000) throw new HttpError(400, 'Posts can contain up to 5,000 characters.');
       const result = await database.prepare(
-        "UPDATE community_posts SET body=?,category=COALESCE(?,category),updated_at=? WHERE id=? AND author_id=? AND status='active' AND expires_at>?"
-      ).bind(body, input.category || null, stamp, id, user.userId, stamp).run();
+        "UPDATE community_posts SET body=?,category=COALESCE(?,category),updated_at=? WHERE id=? AND (author_id=? OR ?=1) AND status='active' AND (expires_at>? OR ?=1)"
+      ).bind(body, input.category || null, stamp, id, user.userId, isAdmin ? 1 : 0, stamp, isAdmin ? 1 : 0).run();
       if (!result.meta.changes) throw new HttpError(404, 'Post not found or no longer editable.');
       return json({ ok: true });
     }
 
     if (input.action === 'delete-post') {
       const id = z.string().uuid().parse(input.postId);
-      const result = await database.prepare("DELETE FROM community_posts WHERE id=? AND author_id=?").bind(id, user.userId).run();
+      const result = await database.prepare("DELETE FROM community_posts WHERE id=? AND (author_id=? OR ?=1)").bind(id, user.userId, isAdmin ? 1 : 0).run();
       if (!result.meta.changes) throw new HttpError(404, 'Post not found.');
       return json({ ok: true });
     }
@@ -320,15 +327,15 @@ export async function POST(request: Request) {
       const body = safeCommunityText(input.body || '');
       if (body.length > 1500) throw new HttpError(400, 'Comments can contain up to 1,500 characters.');
       const result = await database.prepare(
-        "UPDATE community_comments SET body=?,updated_at=? WHERE id=? AND author_id=? AND expires_at>? AND EXISTS (SELECT 1 FROM community_posts p WHERE p.id=community_comments.post_id AND p.status='active' AND p.expires_at>?)"
-      ).bind(body, stamp, id, user.userId, stamp, stamp).run();
+        "UPDATE community_comments SET body=?,updated_at=? WHERE id=? AND (author_id=? OR ?=1) AND (expires_at>? OR ?=1) AND EXISTS (SELECT 1 FROM community_posts p WHERE p.id=community_comments.post_id AND p.status='active' AND (p.expires_at>? OR ?=1))"
+      ).bind(body, stamp, id, user.userId, isAdmin ? 1 : 0, stamp, isAdmin ? 1 : 0, stamp, isAdmin ? 1 : 0).run();
       if (!result.meta.changes) throw new HttpError(404, 'Comment not found or no longer editable.');
       return json({ ok: true });
     }
 
     if (input.action === 'delete-comment') {
       const id = z.string().uuid().parse(input.commentId);
-      const result = await database.prepare("DELETE FROM community_comments WHERE id IN (SELECT id FROM community_comments WHERE id=? AND author_id=?) OR parent_id IN (SELECT id FROM community_comments WHERE id=? AND author_id=?)").bind(id, user.userId, id, user.userId).run();
+      const result = await database.prepare("DELETE FROM community_comments WHERE id IN (SELECT id FROM community_comments WHERE id=? AND (author_id=? OR ?=1)) OR parent_id IN (SELECT id FROM community_comments WHERE id=? AND (author_id=? OR ?=1))").bind(id, user.userId, isAdmin ? 1 : 0, id, user.userId, isAdmin ? 1 : 0).run();
       if (!result.meta.changes) throw new HttpError(404, 'Comment not found.');
       return json({ ok: true });
     }
