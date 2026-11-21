@@ -7,6 +7,11 @@ on:
     branches: [cloudflare-preparation]
   workflow_dispatch:
 
+# Keep only the newest validation run for this branch/PR.
+concurrency:
+  group: banking-feed-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   validate:
     runs-on: ubuntu-latest
