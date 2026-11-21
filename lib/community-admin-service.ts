@@ -16,11 +16,10 @@ async function record(database: D1Database, actor: string, action: string, targe
 
 export async function readCommunityAdmin(database: D1Database, mode: string, search = '', status = 'all') {
   const q = '%' + search.trim().slice(0, 80) + '%';
-  const stamp = timestamp();
   if (mode === 'overview') {
     const [posts, comments, groups, reports, restrictedUsers, members] = await Promise.all([
-      database.prepare("SELECT COUNT(*) AS count FROM community_posts WHERE expires_at>?").bind(stamp).first<{count:number}>(),
-      database.prepare("SELECT COUNT(*) AS count FROM community_comments WHERE expires_at>?").bind(stamp).first<{count:number}>(),
+      database.prepare("SELECT COUNT(*) AS count FROM community_posts").first<{count:number}>(),
+      database.prepare("SELECT COUNT(*) AS count FROM community_comments").first<{count:number}>(),
       database.prepare("SELECT COUNT(*) AS count FROM community_groups WHERE status='active'").first<{count:number}>(),
       database.prepare("SELECT COUNT(*) AS count FROM community_reports WHERE status='open'").first<{count:number}>(),
       database.prepare("SELECT COUNT(*) AS count FROM community_user_controls WHERE status<>'active' OR posting_disabled=1 OR commenting_disabled=1").first<{count:number}>(),
@@ -32,7 +31,7 @@ export async function readCommunityAdmin(database: D1Database, mode: string, sea
     const rows = await database.prepare(
       "SELECT p.id,p.author_id,p.group_id,p.category,p.body,p.status,p.created_at,p.updated_at,p.expires_at," +
       "u.name AS author_name,pi.id AS author_profile_id,g.name AS group_name," +
-      "(SELECT COUNT(*) FROM community_comments c WHERE c.post_id=p.id AND c.expires_at>?) AS comment_count," +
+      "(SELECT COUNT(*) FROM community_comments c WHERE c.post_id=p.id) AS comment_count," +
       "(SELECT COUNT(*) FROM community_reactions r WHERE r.post_id=p.id AND r.reaction_type='like') AS like_count," +
       "(SELECT COUNT(*) FROM community_reactions r WHERE r.post_id=p.id AND r.reaction_type='helpful') AS helpful_count " +
       "FROM community_posts p JOIN platform_users u ON u.id=p.author_id " +
