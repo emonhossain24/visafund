@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { db, fail, guard, rateLimit, readJson, HttpError, now, uid } from '@/lib/server';
-import { identity, superAdmin, requireAdminMFA } from '@/lib/platform';
+import { identity } from '@/lib/server';
+import { superAdmin, requireAdminMFA } from '@/lib/platform';
 
 export const dynamic='force-dynamic';
 const json=(value:unknown,status=200)=>Response.json(value,{status,headers:{'Cache-Control':'no-store'}});
