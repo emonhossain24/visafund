@@ -185,7 +185,7 @@ export async function moderateCommunity(database: D1Database, actor: string, raw
 
   if (input.action === 'delete-comment') {
     const commentId = z.string().uuid().parse(input.commentId);
-    const result = await database.prepare('DELETE FROM community_comments WHERE id=?').bind(commentId).run();
+    const result = await database.prepare('DELETE FROM community_comments WHERE id=? OR parent_id=?').bind(commentId, commentId).run();
     if (!result.meta.changes) throw Object.assign(new Error('Comment not found.'), { status: 404 });
     await record(database, actor, 'comment.delete', commentId, null, reason);
     return { ok: true };
