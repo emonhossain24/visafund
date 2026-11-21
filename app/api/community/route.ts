@@ -324,7 +324,7 @@ export async function POST(request: Request) {
 
     if (input.action === 'delete-comment') {
       const id = z.string().uuid().parse(input.commentId);
-      const result = await database.prepare("DELETE FROM community_comments WHERE id=? AND author_id=?").bind(id, user.userId).run();
+      const result = await database.prepare("DELETE FROM community_comments WHERE (id=? OR parent_id=?) AND author_id=?").bind(id, id, user.userId).run();
       if (!result.meta.changes) throw new HttpError(404, 'Comment not found.');
       return json({ ok: true });
     }
