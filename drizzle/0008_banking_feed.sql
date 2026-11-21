@@ -33,7 +33,7 @@ CREATE TABLE community_comments (
   id TEXT PRIMARY KEY NOT NULL,
   post_id TEXT NOT NULL REFERENCES community_posts(id) ON DELETE CASCADE,
   author_id TEXT NOT NULL REFERENCES platform_users(id) ON DELETE CASCADE,
-  parent_id TEXT REFERENCES community_comments(id) ON DELETE SET NULL,
+  parent_id TEXT REFERENCES community_comments(id) ON DELETE CASCADE,
   body TEXT NOT NULL CHECK (length(body) BETWEEN 1 AND 1500),
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL,
