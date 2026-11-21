@@ -31,18 +31,19 @@ const schema=z.object({
 export async function GET(request:Request){
  try{
   const params=new URL(request.url).searchParams;
-  const adminMode=params.get('admin')==='1';
-  if(adminMode){
-   const user=await superAdmin();await rateLimit(user.userId,'banking-hub-admin-read',60);await requireAdminMFA();
-   const kind=params.get('kind');
-   const rows=kind?await db().prepare('SELECT * FROM banking_hub_content WHERE kind=? ORDER BY sort_order,updated_at DESC').bind(kind).all():await db().prepare('SELECT * FROM banking_hub_content ORDER BY kind,sort_order,updated_at DESC').all();
-   return json({items:rows.results});
-  }
-  await identity();
+  const user=await identity();
+  const isAdmin=await superAdmin().then(()=>true).catch(()=>false);
+  if(isAdmin) await requireAdminMFA();
   const kind=params.get('kind');
-  if(kind&&kind!=='event')return json({locked:true,items:[]});
+  if(isAdmin){
+   const rows=kind
+    ? await db().prepare('SELECT * FROM banking_hub_content WHERE kind=? ORDER BY sort_order,updated_at DESC').bind(kind).all()
+    : await db().prepare('SELECT * FROM banking_hub_content ORDER BY kind,sort_order,updated_at DESC').all();
+   return json({locked:false,isAdmin:true,items:rows.results});
+  }
+  if(kind&&kind!=='event')return json({locked:true,isAdmin:false,items:[]});
   const rows=await db().prepare("SELECT id,kind,title,summary,body,category,country,platform,meeting_url,venue,starts_at,timezone,duration_minutes,status,access_level,sort_order,created_at,updated_at FROM banking_hub_content WHERE kind='event' AND status='published' AND access_level='public' AND (starts_at IS NULL OR starts_at>=?) ORDER BY starts_at,sort_order LIMIT 100").bind(now()).all();
-  return json({locked:false,items:rows.results});
+  return json({locked:false,isAdmin:false,items:rows.results});
  }catch(error){return fail(error)}
 }
 export async function POST(request:Request){
