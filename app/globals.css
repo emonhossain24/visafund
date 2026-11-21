@@ -791,3 +791,35 @@ body {
 .community-page .hub-locked p{margin:0;color:#c0d2e6;line-height:1.7}
 .community-page .hub-event-link{margin-top:10px;color:#91caff;font-size:12px;font-weight:750}
 @media(max-width:620px){.banking-hub-form-grid{grid-template-columns:1fr}.banking-hub-form{padding:14px}}
+
+
+/* Compact horizontal empty states for Banking Feed */
+.community-page .community-empty-state{
+ display:flex;
+ flex-direction:row;
+ align-items:center;
+ justify-content:flex-start;
+ gap:12px 22px;
+ min-height:0;
+ padding:15px 20px;
+ border:1px solid #405775;
+ border-radius:13px;
+ background:linear-gradient(110deg,#1b3049,#203a56);
+}
+.community-page .community-empty-state h3{
+ flex:0 0 auto;
+ margin:0;
+ color:#edf5ff;
+ font-size:14px;
+ font-weight:750;
+}
+.community-page .community-empty-state p{
+ margin:0;
+ color:#bdcde0;
+ font-size:13px;
+ line-height:1.5;
+}
+@media(max-width:560px){
+ .community-page .community-empty-state{flex-wrap:wrap;gap:5px 12px;padding:13px 15px}
+ .community-page .community-empty-state h3,.community-page .community-empty-state p{flex:1 1 100%}
+}
