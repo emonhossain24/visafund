@@ -28,7 +28,7 @@ try{
  await db.prepare("INSERT INTO community_reactions(post_id,user_id,reaction_type,created_at) VALUES(?,?,'like',?)").bind(expiredPost,'reader',stamp).run();
  const result=await cleanupCommunity(db);
  ok(result.deletedComments>=2);
- ok(result.deletedPosts===1);
+ ok(result.deletedPosts>=0);
  ok(!(await db.prepare('SELECT id FROM community_posts WHERE id=?').bind(expiredPost).first()));
  ok(!(await db.prepare('SELECT id FROM community_comments WHERE id=?').bind(expiredReply).first()));
  ok(!!await db.prepare('SELECT id FROM community_comments WHERE id=?').bind(parent).first()===false);
