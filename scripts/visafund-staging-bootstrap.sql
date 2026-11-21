@@ -191,29 +191,29 @@ SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE '_cf_%' OR
 
 
 -- Banking Feed schema (same additive migration as drizzle/0008_banking_feed.sql)
-CREATE TABLE IF NOT EXISTS community_groups(id TEXT PRIMARY KEY NOT NULL,slug TEXT NOT NULL UNIQUE,name TEXT NOT NULL,description TEXT NOT NULL DEFAULT '',join_mode TEXT NOT NULL DEFAULT 'open',status TEXT NOT NULL DEFAULT 'active',created_by TEXT,created_at TEXT NOT NULL,updated_at TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS community_groups(id TEXT PRIMARY KEY NOT NULL,slug TEXT NOT NULL UNIQUE,name TEXT NOT NULL,description TEXT NOT NULL DEFAULT '',join_mode TEXT NOT NULL DEFAULT 'open',status TEXT NOT NULL DEFAULT 'active',created_by TEXT REFERENCES platform_users(id) ON DELETE SET NULL,created_at TEXT NOT NULL,updated_at TEXT NOT NULL);
 CREATE INDEX IF NOT EXISTS community_groups_status ON community_groups(status);
-CREATE TABLE IF NOT EXISTS community_posts(id TEXT PRIMARY KEY NOT NULL,author_id TEXT NOT NULL,group_id TEXT,category TEXT NOT NULL,body TEXT NOT NULL,status TEXT NOT NULL DEFAULT 'active',created_at TEXT NOT NULL,updated_at TEXT NOT NULL,expires_at TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS community_posts(id TEXT PRIMARY KEY NOT NULL,author_id TEXT NOT NULL REFERENCES platform_users(id) ON DELETE CASCADE,group_id TEXT REFERENCES community_groups(id) ON DELETE CASCADE,category TEXT NOT NULL,body TEXT NOT NULL,status TEXT NOT NULL DEFAULT 'active',created_at TEXT NOT NULL,updated_at TEXT NOT NULL,expires_at TEXT NOT NULL);
 CREATE INDEX IF NOT EXISTS community_posts_feed ON community_posts(status,expires_at,created_at);
 CREATE INDEX IF NOT EXISTS community_posts_author ON community_posts(author_id,expires_at);
 CREATE INDEX IF NOT EXISTS community_posts_group ON community_posts(group_id,status,expires_at);
 CREATE INDEX IF NOT EXISTS community_posts_category ON community_posts(category,status,expires_at);
-CREATE TABLE IF NOT EXISTS community_comments(id TEXT PRIMARY KEY NOT NULL,post_id TEXT NOT NULL,author_id TEXT NOT NULL,parent_id TEXT,body TEXT NOT NULL,created_at TEXT NOT NULL,updated_at TEXT NOT NULL,expires_at TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS community_comments(id TEXT PRIMARY KEY NOT NULL,post_id TEXT NOT NULL REFERENCES community_posts(id) ON DELETE CASCADE,author_id TEXT NOT NULL REFERENCES platform_users(id) ON DELETE CASCADE,parent_id TEXT REFERENCES community_comments(id) ON DELETE CASCADE,body TEXT NOT NULL,created_at TEXT NOT NULL,updated_at TEXT NOT NULL,expires_at TEXT NOT NULL);
 CREATE INDEX IF NOT EXISTS community_comments_post ON community_comments(post_id,expires_at,created_at);
 CREATE INDEX IF NOT EXISTS community_comments_author ON community_comments(author_id,expires_at);
 CREATE INDEX IF NOT EXISTS community_comments_parent ON community_comments(parent_id);
 CREATE INDEX IF NOT EXISTS community_comments_expiry ON community_comments(expires_at);
-CREATE TABLE IF NOT EXISTS community_reactions(post_id TEXT NOT NULL,user_id TEXT NOT NULL,reaction_type TEXT NOT NULL,created_at TEXT NOT NULL,PRIMARY KEY(post_id,user_id));
+CREATE TABLE IF NOT EXISTS community_reactions(post_id TEXT NOT NULL REFERENCES community_posts(id) ON DELETE CASCADE,user_id TEXT NOT NULL REFERENCES platform_users(id) ON DELETE CASCADE,reaction_type TEXT NOT NULL,created_at TEXT NOT NULL,PRIMARY KEY(post_id,user_id));
 CREATE INDEX IF NOT EXISTS community_reactions_post ON community_reactions(post_id,reaction_type);
-CREATE TABLE IF NOT EXISTS community_saved_posts(user_id TEXT NOT NULL,post_id TEXT NOT NULL,created_at TEXT NOT NULL,PRIMARY KEY(user_id,post_id));
+CREATE TABLE IF NOT EXISTS community_saved_posts(user_id TEXT NOT NULL REFERENCES platform_users(id) ON DELETE CASCADE,post_id TEXT NOT NULL REFERENCES community_posts(id) ON DELETE CASCADE,created_at TEXT NOT NULL,PRIMARY KEY(user_id,post_id));
 CREATE INDEX IF NOT EXISTS community_saved_posts_user ON community_saved_posts(user_id,created_at DESC);
-CREATE TABLE IF NOT EXISTS community_group_members(group_id TEXT NOT NULL,user_id TEXT NOT NULL,status TEXT NOT NULL DEFAULT 'active',joined_at TEXT NOT NULL,PRIMARY KEY(group_id,user_id));
+CREATE TABLE IF NOT EXISTS community_group_members(group_id TEXT NOT NULL REFERENCES community_groups(id) ON DELETE CASCADE,user_id TEXT NOT NULL REFERENCES platform_users(id) ON DELETE CASCADE,status TEXT NOT NULL DEFAULT 'active',joined_at TEXT NOT NULL,PRIMARY KEY(group_id,user_id));
 CREATE INDEX IF NOT EXISTS community_group_members_user ON community_group_members(user_id,status);
-CREATE TABLE IF NOT EXISTS community_reports(id TEXT PRIMARY KEY NOT NULL,reporter_id TEXT NOT NULL,post_id TEXT,comment_id TEXT,reason TEXT NOT NULL,status TEXT NOT NULL DEFAULT 'open',created_at TEXT NOT NULL,reviewed_by TEXT,reviewed_at TEXT,CHECK((post_id IS NOT NULL AND comment_id IS NULL) OR (post_id IS NULL AND comment_id IS NOT NULL)));
+CREATE TABLE IF NOT EXISTS community_reports(id TEXT PRIMARY KEY NOT NULL,reporter_id TEXT NOT NULL REFERENCES platform_users(id) ON DELETE CASCADE,post_id TEXT REFERENCES community_posts(id) ON DELETE CASCADE,comment_id TEXT REFERENCES community_comments(id) ON DELETE CASCADE,reason TEXT NOT NULL,status TEXT NOT NULL DEFAULT 'open',created_at TEXT NOT NULL,reviewed_by TEXT,reviewed_at TEXT,CHECK((post_id IS NOT NULL AND comment_id IS NULL) OR (post_id IS NULL AND comment_id IS NOT NULL)));
 CREATE INDEX IF NOT EXISTS community_reports_status ON community_reports(status,created_at DESC);
-CREATE TABLE IF NOT EXISTS community_user_controls(user_id TEXT PRIMARY KEY NOT NULL,status TEXT NOT NULL DEFAULT 'active',posting_disabled INTEGER NOT NULL DEFAULT 0,commenting_disabled INTEGER NOT NULL DEFAULT 0,reason TEXT NOT NULL DEFAULT '',updated_by TEXT,updated_at TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS community_user_controls(user_id TEXT PRIMARY KEY NOT NULL REFERENCES platform_users(id) ON DELETE CASCADE,status TEXT NOT NULL DEFAULT 'active',posting_disabled INTEGER NOT NULL DEFAULT 0,commenting_disabled INTEGER NOT NULL DEFAULT 0,reason TEXT NOT NULL DEFAULT '',updated_by TEXT,updated_at TEXT NOT NULL);
 CREATE INDEX IF NOT EXISTS community_user_controls_status ON community_user_controls(status);
-CREATE TABLE IF NOT EXISTS community_moderation_logs(id TEXT PRIMARY KEY NOT NULL,actor_id TEXT NOT NULL,target_user TEXT,target_ref TEXT,action TEXT NOT NULL,reason TEXT NOT NULL DEFAULT '',created_at TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS community_moderation_logs(id TEXT PRIMARY KEY NOT NULL,actor_id TEXT NOT NULL REFERENCES platform_users(id) ON DELETE CASCADE,target_user TEXT,target_ref TEXT,action TEXT NOT NULL,reason TEXT NOT NULL DEFAULT '',created_at TEXT NOT NULL);
 CREATE INDEX IF NOT EXISTS community_moderation_logs_created ON community_moderation_logs(created_at DESC);
 INSERT OR IGNORE INTO community_groups(id,slug,name,description,join_mode,status,created_at,updated_at) VALUES
 ('community-bank-account','bank-account','Bank Account','Opening, maintaining, and managing student bank accounts.','open','active',datetime('now'),datetime('now')),
