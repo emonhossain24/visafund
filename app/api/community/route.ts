@@ -103,7 +103,7 @@ async function readPosts(owner: string, options: {
   const args: unknown[] = [];
   if (!options.isAdmin) {
     where.push('p.expires_at>?'); args.push(stamp);
-    where.push("(p.group_id IS NULL OR EXISTS (SELECT 1 FROM community_group_members gm JOIN community_groups gx ON gx.id=gm.group_id WHERE gm.group_id=p.group_id AND gm.user_id=? AND gm.status='active' AND gx.status='active'))'); args.push(owner);
+    where.push("(p.group_id IS NULL OR EXISTS (SELECT 1 FROM community_group_members gm JOIN community_groups gx ON gx.id=gm.group_id WHERE gm.group_id=p.group_id AND gm.user_id=? AND gm.status='active' AND gx.status='active'))"); args.push(owner);
   }
   if (options.groupId) {
     where.push('p.group_id=?');
