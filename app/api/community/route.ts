@@ -73,7 +73,7 @@ function safeCommunityText(value: string) {
 
 async function assertPostVisible(postId: string, owner: string, isAdmin = false) {
   const post = await db().prepare(
-    "SELECT id,group_id FROM community_posts WHERE id=? AND status='active'" + (isAdmin ? '' : ' AND expires_at>?')
+    "SELECT id,group_id FROM community_posts WHERE id=?" + (isAdmin ? '' : " AND status='active' AND expires_at>?")
   ).bind(...(isAdmin ? [postId] : [postId, now()])).first<{id:string;group_id:string|null}>();
   if (!post) throw new HttpError(404, 'This post is no longer available.');
   if (post.group_id && !isAdmin) {
@@ -99,9 +99,10 @@ async function readPosts(owner: string, options: {
   const stamp = now();
   const page = Math.max(1, Math.min(10000, options.page || 1));
   const limit = 20;
-  const where = ["p.status='active'"];
+  const where: string[] = [];
   const args: unknown[] = [];
   if (!options.isAdmin) {
+    where.push("p.status='active'");
     where.push('p.expires_at>?'); args.push(stamp);
     where.push("(p.group_id IS NULL OR EXISTS (SELECT 1 FROM community_group_members gm JOIN community_groups gx ON gx.id=gm.group_id WHERE gm.group_id=p.group_id AND gm.user_id=? AND gm.status='active' AND gx.status='active'))'); args.push(owner);
   }
