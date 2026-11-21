@@ -12,6 +12,7 @@ let checks=0;
 const ok=(value:unknown)=>{assert.ok(value);checks++};
 try{
  const db=await mf.getD1Database('DB');
+ await db.prepare("CREATE TABLE platform_roles(owner TEXT NOT NULL,role TEXT NOT NULL)").run();
  await db.prepare("CREATE TABLE platform_users(id TEXT PRIMARY KEY,name TEXT NOT NULL,email TEXT NOT NULL,status TEXT NOT NULL,created TEXT NOT NULL,last_seen TEXT NOT NULL,preferences TEXT NOT NULL)").run();
  const migration=await readFile('drizzle/0008_banking_feed.sql','utf8');
  for(const statement of migration.split(';').map(s=>s.trim()).filter(Boolean))await db.prepare(statement).run();
@@ -39,7 +40,16 @@ try{
  await db.prepare("INSERT INTO community_comments(id,post_id,author_id,body,created_at,updated_at,expires_at) VALUES(?,?,?,'expired reply',?,?,?)").bind(expiredReply,post,'reader',stamp,stamp,past).run();
  await db.prepare('INSERT INTO community_saved_posts(user_id,post_id,created_at) VALUES(?,?,?)').bind('reader',expiredPost,stamp).run();
  await db.prepare("INSERT INTO community_reactions(post_id,user_id,reaction_type,created_at) VALUES(?,?,'like',?)").bind(expiredPost,'reader',stamp).run();
+ // Admin-owned posts/comments and posts containing an admin comment must survive automatic cleanup.
+ await db.prepare("INSERT INTO platform_roles(owner,role) VALUES('admin','SUPER_ADMIN')").run();
+ const adminPost=crypto.randomUUID(),adminCommentPost=crypto.randomUUID(),adminComment=crypto.randomUUID();
+ await db.prepare("INSERT INTO community_posts(id,author_id,category,body,status,created_at,updated_at,expires_at) VALUES(?,?, 'General Discussion','admin post','active',?,?,?)").bind(adminPost,'admin',past,past,past).run();
+ await db.prepare("INSERT INTO community_posts(id,author_id,category,body,status,created_at,updated_at,expires_at) VALUES(?,?, 'General Discussion','member post with admin comment','active',?,?,?)").bind(adminCommentPost,'author',past,past,past).run();
+ await db.prepare("INSERT INTO community_comments(id,post_id,author_id,body,created_at,updated_at,expires_at) VALUES(?,?,?,'admin comment',?,?,?)").bind(adminComment,adminCommentPost,'admin',past,past,past).run();
  const result=await cleanupCommunity(db);
+ ok(!!await db.prepare('SELECT id FROM community_posts WHERE id=?').bind(adminPost).first());
+ ok(!!await db.prepare('SELECT id FROM community_comments WHERE id=?').bind(adminComment).first());
+ ok(!!await db.prepare('SELECT id FROM community_posts WHERE id=?').bind(adminCommentPost).first());
  ok(result.deletedComments>=2);
  ok(result.deletedPosts>=0);
  ok(!(await db.prepare('SELECT id FROM community_posts WHERE id=?').bind(expiredPost).first()));
