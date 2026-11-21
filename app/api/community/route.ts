@@ -14,6 +14,10 @@ const CATEGORIES = [
   'Financial Documents',
   'Bank Issues',
   'General Discussion',
+  'Student Questions',
+  'University & Visa Discussions',
+  'Scholarships',
+  'Success Stories',
 ] as const;
 
 const json = (value: unknown, status = 200) =>
