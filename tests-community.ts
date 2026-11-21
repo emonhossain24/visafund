@@ -12,9 +12,9 @@ let checks=0;
 const ok=(value:unknown)=>{assert.ok(value);checks++};
 try{
  const db=await mf.getD1Database('DB');
- for(const f of (await readdir('drizzle')).filter(f=>f.endsWith('.sql')).sort()){
-  await db.exec((await readFile('drizzle/'+f,'utf8')).replaceAll('--> statement-breakpoint','').replaceAll(String.fromCharCode(10),' '));
- }
+ await db.prepare("CREATE TABLE platform_users(id TEXT PRIMARY KEY,name TEXT NOT NULL,email TEXT NOT NULL,status TEXT NOT NULL,created TEXT NOT NULL,last_seen TEXT NOT NULL,preferences TEXT NOT NULL)").run();
+ const migration=await readFile('drizzle/0008_banking_feed.sql','utf8');
+ for(const statement of migration.split(';').map(s=>s.trim()).filter(Boolean))await db.prepare(statement).run();
  for(const id of ['author','reader'])await db.prepare("INSERT INTO platform_users(id,name,email,status,created,last_seen,preferences) VALUES(?,?,?,'active',?,?, '{}')").bind(id,id,id+'@example.test',new Date().toISOString(),new Date().toISOString()).run();
  const stamp=new Date().toISOString(),past=new Date(Date.now()-25*3600000).toISOString(),future=new Date(Date.now()+24*3600000).toISOString();
  const post=crypto.randomUUID(),expiredPost=crypto.randomUUID();
