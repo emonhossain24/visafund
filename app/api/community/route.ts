@@ -225,7 +225,7 @@ export async function GET(request: Request) {
       const member = await db().prepare(
         "SELECT 1 AS ok FROM community_group_members WHERE group_id=? AND user_id=? AND status='active'"
       ).bind(groupId, user.userId).first();
-      if (!member) throw new HttpError(403, 'Join this community to view its feed.');
+      if (!member && !isAdmin) throw new HttpError(403, 'Join this community to view its feed.');
     }
     const category = params.get('category') || undefined;
     if (category && !CATEGORIES.includes(category as typeof CATEGORIES[number])) throw new HttpError(400, 'Invalid category.');
@@ -292,8 +292,8 @@ export async function POST(request: Request) {
       if (body.length > 1500) throw new HttpError(400, 'Comments can contain up to 1,500 characters.');
       if (input.parentId) {
         const parent = await database.prepare(
-          "SELECT id FROM community_comments WHERE id=? AND post_id=? AND parent_id IS NULL AND expires_at>?"
-        ).bind(input.parentId, postId, stamp).first();
+          "SELECT id FROM community_comments WHERE id=? AND post_id=? AND parent_id IS NULL AND (?=1 OR expires_at>?)"
+        ).bind(input.parentId, postId, isAdmin ? 1 : 0, stamp).first();
         if (!parent) throw new HttpError(404, 'The comment you are replying to is no longer available.');
       }
       const id = uid();
@@ -342,7 +342,7 @@ export async function POST(request: Request) {
 
     if (input.action === 'react') {
       const postId = z.string().uuid().parse(input.postId);
-      await assertPostVisible(postId, user.userId);
+      await assertPostVisible(postId, user.userId, isAdmin);
       if (!input.reaction) throw new HttpError(400, 'Choose Like or Helpful.');
       const old = await database.prepare(
         'SELECT reaction_type FROM community_reactions WHERE post_id=? AND user_id=?'
@@ -392,10 +392,10 @@ export async function POST(request: Request) {
       if (postId) await assertPostVisible(postId, user.userId);
       if (commentId) {
         const comment = await database.prepare(
-          "SELECT c.post_id FROM community_comments c WHERE c.id=? AND c.expires_at>?"
-        ).bind(commentId, stamp).first<{post_id:string}>();
+          "SELECT c.post_id FROM community_comments c WHERE c.id=? AND (?=1 OR c.expires_at>?)"
+        ).bind(commentId, isAdmin ? 1 : 0, stamp).first<{post_id:string}>();
         if (!comment) throw new HttpError(404, 'Comment not found.');
-        await assertPostVisible(comment.post_id, user.userId);
+        await assertPostVisible(comment.post_id, user.userId, isAdmin);
       }
       const existing = await database.prepare(
         "SELECT id FROM community_reports WHERE reporter_id=? AND COALESCE(post_id,'')=COALESCE(?,'') AND COALESCE(comment_id,'')=COALESCE(?,'') AND status='open'"
