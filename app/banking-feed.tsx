@@ -73,7 +73,7 @@ export default function BankingFeed(){
      <h2>{view==='premium' ? 'Premium Guidance' : view==='advisor' ? 'Ask an Advisor' : view==='resources' ? 'Resources' : 'Country Guides'}</h2>
      <p className="hub-intro">All content is unlocked and free for administrators.</p>
      {hubEventsError && <p role="alert">{hubEventsError}</p>}
-     {hubEvents.length ? <div className="hub-grid">{hubEvents.map(item => <article className="hub-card" key={item.id}><span className="hub-card-icon">✦</span><h3>{item.title}</h3><p>{item.summary || item.body}</p><small>{[item.category,item.country,item.status].filter(Boolean).join(' · ')}</small></article>)}</div> : <div className="hub-note"><strong>No content added yet.</strong><p>Use Banking Hub content management in Admin to create and publish this section.</p></div>}
+     {hubEvents.length ? <div className="hub-grid">{hubEvents.map(item => <article className="hub-card" key={item.id}><span className="hub-card-icon">✦</span><h3>{item.title}</h3><p>{item.summary || item.body}</p><small>{item.category}</small></article>)}</div> : <div className="hub-note"><strong>No content added yet.</strong><p>Use Banking Hub content management in Admin to create and publish this section.</p></div>}
     </>
    ) : (
     <>
