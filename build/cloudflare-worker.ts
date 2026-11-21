@@ -10,8 +10,10 @@ export default {fetch(request:Request,env:Cloudflare.Env,ctx:ExecutionContext){
  return handler.fetch(safeRequest,env,ctx);
 },
  async scheduled(controller:ScheduledController,env:Cloudflare.Env){
-  const banned=controller.cron==='0 3 * * *'?await banInactiveUsers(env.DB):0;
-  const cleanup=await cleanupCommunity(env.DB);
+  const database=env.DB;
+  if(!database)throw new Error('Cloudflare D1 binding DB is unavailable during scheduled maintenance.');
+  const banned=controller.cron==='0 3 * * *'?await banInactiveUsers(database):0;
+  const cleanup=await cleanupCommunity(database);
   console.log('VisaFund scheduled maintenance finished',{banned,...cleanup});
  }
 };
