@@ -20,10 +20,10 @@ try{
  const hubId=crypto.randomUUID(),hubStamp=new Date().toISOString();
  await db.prepare("INSERT INTO banking_hub_content(id,kind,title,summary,body,category,country,platform,meeting_url,venue,starts_at,timezone,duration_minutes,fee_amount,fee_currency,status,access_level,sort_order,created_by,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)")
   .bind(hubId,'event','Student workshop','Open workshop','Event details','IELTS','','Google Meet','https://meet.google.com/example','Online',new Date(Date.now()+86400000).toISOString(),'Asia/Dhaka',60,null,'BDT','published','public',0,'admin',hubStamp,hubStamp).run();
- const publicEvent=await db.prepare("SELECT title,platform,status,access_level FROM banking_hub_content WHERE id=?").bind(hubId).first<{title:string;platform:string;status:string;access_level:string}>();
+ const publicEvent=await db.prepare("SELECT title,platform,status,access_level FROM banking_hub_content WHERE id=?").bind(hubId).first() as {title:string;platform:string;status:string;access_level:string}|null;
  ok(publicEvent?.title==='Student workshop'&&publicEvent.platform==='Google Meet'&&publicEvent.status==='published'&&publicEvent.access_level==='public');
  await db.prepare("UPDATE banking_hub_content SET title=?,status='draft',updated_at=? WHERE id=?").bind('Updated workshop',new Date().toISOString(),hubId).run();
- const updatedEvent=await db.prepare("SELECT title,status FROM banking_hub_content WHERE id=?").bind(hubId).first<{title:string;status:string}>();
+ const updatedEvent=await db.prepare("SELECT title,status FROM banking_hub_content WHERE id=?").bind(hubId).first() as {title:string;status:string}|null;
  ok(updatedEvent?.title==='Updated workshop'&&updatedEvent.status==='draft');
  await db.prepare("DELETE FROM banking_hub_content WHERE id=?").bind(hubId).run();
  ok(!(await db.prepare("SELECT id FROM banking_hub_content WHERE id=?").bind(hubId).first()));
