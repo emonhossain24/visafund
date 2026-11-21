@@ -12,7 +12,7 @@ const categories=['Bank Account','Bank Statement','Bank Solvency','Bank Transact
 const timeLeft=(value:string)=>{const n=Date.parse(value)-Date.now();if(n<=0)return 'Expired';const h=Math.floor(n/3600000);return h>=24?Math.floor(h/24)+'d left':Math.max(1,h)+'h left'};
 export default function BankingFeed(){
  const [posts,setPosts]=useState<Post[]>([]),[groups,setGroups]=useState<Group[]>([]),[comments,setComments]=useState<Record<string,Comment[]>>({});
- const [body,setBody]=useState(''),[category,setCategory]=useState(categories[0]),[groupId,setGroupId]=useState(''),[activeGroup,setActiveGroup]=useState(''),[sort,setSort]=useState('latest'),[query,setQuery]=useState(''),[categoryFilter,setCategoryFilter]=useState(''),[page,setPage]=useState(1),[hasMore,setHasMore]=useState(false),[busy,setBusy]=useState(false),[error,setError]=useState('');
+ const [body,setBody]=useState(''),[category,setCategory]=useState(categories[0]),[groupId,setGroupId]=useState(''),[activeGroup,setActiveGroup]=useState(''),[sort,setSort]=useState('latest'),[query,setQuery]=useState(''),[categoryFilter,setCategoryFilter]=useState(''),[page,setPage]=useState(1),[hasMore,setHasMore]=useState(false),[busy,setBusy]=useState(false),[,setError]=useState('');
  const [commentDraft,setCommentDraft]=useState<Record<string,string>>({}),[replyDraft,setReplyDraft]=useState<Record<string,string>>({}),[replyingTo,setReplyingTo]=useState<string|null>(null);
  const [view,setView]=useState<View>('feed'),[profileId,setProfileId]=useState(''),[profile,setProfile]=useState<Profile|null>(null),[profileComments,setProfileComments]=useState<Comment[]>([]);
  const [hubEvents,setHubEvents]=useState<HubEvent[]>([]),[hubEventsError,setHubEventsError]=useState('');
