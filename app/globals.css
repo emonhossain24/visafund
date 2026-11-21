@@ -631,3 +631,69 @@ body {
 @media(max-width:1120px){.community-page .community-layout{grid-template-columns:210px minmax(0,1fr)}.community-page .community-rightbar{display:none}}
 @media(max-width:720px){.community-page{padding:14px 10px 36px}.community-page .community-hero{min-height:0;padding:25px 20px;border-radius:15px}.community-page .community-hero h1{font-size:30px}.community-page .community-hero-copy>p{font-size:14px}.community-page .community-hero-art{display:none}.community-page .community-heading{display:block}.community-page .community-heading h2{font-size:21px}.community-page .community-retention{display:inline-block;margin-top:10px;white-space:normal}.community-page .community-layout{grid-template-columns:minmax(0,1fr);gap:13px}.community-page .community-groups{position:static}.community-page .community-groups .community-group-row{display:inline-flex;width:100%}.community-page .community-view-tabs{overflow-x:auto;flex-wrap:nowrap}.community-page .community-view-tabs button{white-space:nowrap;padding:9px 13px}.community-page .community-view-tabs>span{display:none}.community-page .community-composer{padding:15px}.community-page .community-compose-row{align-items:stretch}.community-page .community-compose-row select{flex:1 1 100%}.community-page .community-compose-row button{width:100%}.community-page .community-feed-toolbar{align-items:stretch}.community-page .community-filters{align-items:stretch;flex-wrap:wrap}.community-page .community-filters>*{min-width:0;flex:1 1 42%}.community-page .community-post{padding:15px 14px 9px}.community-page .community-category{max-width:120px;white-space:normal}.community-page .community-actions button{padding:7px 9px}.community-page .community-comment-form{align-items:stretch}}
 @media(prefers-reduced-motion:no-preference){.community-page .community-post,.community-page .community-info-card{transition:box-shadow .18s ease,transform .18s ease}.community-page .community-post:hover,.community-page .community-info-card:hover{box-shadow:0 7px 22px #18395d14;transform:translateY(-1px)}}
+
+
+
+/* Dark, high-contrast Banking Feed theme — no white surfaces */
+.community-page{--vf-ink:#f1f5fc;--vf-muted:#bdcbe0;--vf-line:#405775;--vf-blue:#67a9ff;--vf-blue-dark:#327bd0;color:var(--vf-ink);background:#101d31;border-radius:18px}
+.community-page .community-heading h2,.community-page .community-heading p{color:var(--vf-ink)}
+.community-page .community-heading p,.community-page .community-feed-toolbar>div:first-child small{color:#b8c9df}
+.community-page .community-retention{border-color:#385b82;background:#203d60;color:#d5e8ff}
+.community-page .community-view-tabs{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;padding:10px;margin:0 0 12px;border:1px solid #405775;border-radius:14px;background:#192b43}
+.community-page .community-view-tabs button{display:flex;align-items:center;justify-content:flex-start;gap:13px;min-width:0;min-height:72px;padding:13px 20px;border:1px solid #405775;border-radius:11px;background:#223852;color:#e0eaf8;text-align:left}
+.community-page .community-view-tabs button>span:last-child{display:flex;flex-direction:column;align-items:flex-start;gap:3px}
+.community-page .community-view-tabs button strong{font-size:15px;font-weight:800;white-space:nowrap}
+.community-page .community-view-tabs button small{color:#b7c9df;font-size:11px;font-weight:500}
+.community-page .community-view-tabs button.active{border-color:#6baeff;background:#244f7c;color:#fff;box-shadow:inset 0 -3px 0 #7db8ff}
+.community-page .community-view-tabs button.active small{color:#dcecff}
+.community-page .community-nav-icon{display:grid;place-items:center;flex:0 0 40px;width:40px;height:40px;border-radius:10px;background:#304e70;color:#c6e0ff;font-size:20px}
+.community-page .community-view-tabs button.active .community-nav-icon{background:#397bc0;color:#fff}
+.community-page .community-nav-user{grid-column:1/-1;color:#c9d8ea;padding:2px 9px;font-size:12px}
+.community-page .community-topic-nav{display:flex;align-items:center;gap:8px;overflow-x:auto;padding:4px 1px 16px;margin-bottom:15px;scrollbar-width:thin}
+.community-page .community-topic-nav button{flex:0 0 auto;padding:9px 15px;border:1px solid #405775;border-radius:24px;background:#1b304a;color:#c8d8ec;font-size:12px;font-weight:750;white-space:nowrap}
+.community-page .community-topic-nav button.active{border-color:#6baeff;background:#285887;color:#fff}
+.community-page .community-layout{gap:18px}
+.community-page .community-groups{border-color:#405775;background:#1b2d45;box-shadow:none}
+.community-page .community-side-heading{border-color:#405775}
+.community-page .community-side-heading>span,.community-page .community-side-foot{color:#a9bdd6}
+.community-page .community-side-heading h2{color:#f1f5fc}
+.community-page .community-group{color:#dce8f7}
+.community-page .community-group.active{background:#294c70;color:#fff}
+.community-page .community-group-icon{background:#304a68;color:#c9e1ff}
+.community-page .community-group.active .community-group-icon{background:#397bc0;color:#fff}
+.community-page .community-group-label small{color:#b1c4dc}
+.community-page .community-join{border-color:#4a6788;background:#263e5a;color:#dcecff}
+.community-page .community-side-foot{border-color:#405775}
+.community-page .panel,.community-page .community-post,.community-page .community-info-card{border-color:#405775;background:#1b2d45;color:#e7eef9;box-shadow:0 4px 16px #07111f55}
+.community-page .community-composer-title h2,.community-page .community-feed-toolbar>div:first-child strong{color:#f2f6fd}
+.community-page .community-composer-title p,.community-page .community-composer-hint{color:#b7c8dd}
+.community-page .community-avatar{border-color:#45658a;background:#29486a;color:#dcecff}
+.community-page .community-compose-avatar{background:#315982;color:#fff}
+.community-page .community-composer textarea,.community-page .community-comment-form input,.community-page .community-filters input,.community-page .community-compose-row select,.community-page .community-filters select{border-color:#4a6381;background:#14263c;color:#f0f5fc}
+.community-page .community-composer textarea::placeholder,.community-page input::placeholder{color:#a8bad0}
+.community-page .community-composer textarea:focus,.community-page input:focus,.community-page select:focus{border-color:#79b6ff;box-shadow:0 0 0 2px #5599ed35}
+.community-page .community-filters{border-color:#405775;background:#1b2d45}
+.community-page .community-filters button,.community-page .community-actions button{color:#c5d5e8}
+.community-page .community-filters button.active,.community-page .community-actions button.active{background:#294f76;color:#fff}
+.community-page .community-filters input,.community-page .community-filters select{background:#14263c;color:#edf4fd}
+.community-page .community-post-meta strong,.community-page .community-comment strong{color:#f0f5fc}
+.community-page .community-post-meta small,.community-page .community-comment small,.community-page .community-post>small{color:#b4c6dc}
+.community-page .community-inline-link{color:#82bdff}
+.community-page .community-category{border-color:#496889;background:#29435f;color:#d6e8fc}
+.community-page .community-post-body{color:#e2ebf7}
+.community-page .community-actions,.community-page .community-comments{border-color:#405775}
+.community-page .community-actions button:hover,.community-page .community-filters button:hover{background:#2a4564;color:#fff}
+.community-page .community-comment{border-color:#405775;background:#14263c}
+.community-page .community-comment p{color:#dce7f5}
+.community-page .community-reply{border-left-color:#659bd2;background:#1d3652}
+.community-page .community-comment-form button{background:#367fc9;color:#fff}
+.community-page .community-info-label{color:#9fc9f7}
+.community-page .community-info-card h3{color:#f1f5fc}
+.community-page .community-topic-list span{background:#263f5c;color:#d5e8ff}
+.community-page .community-guidelines ul{color:#c1d0e2}
+.community-page .community-expiry-card{border-color:#45678e;background:#203c5b}
+.community-page .community-expiry-card p{color:#d1e1f4}
+.community-page button.primary{background:#347fc9;color:#fff}
+.community-page button.primary:hover{background:#4795e0}
+.community-page .community-view-tabs button:focus-visible,.community-page .community-topic-nav button:focus-visible,.community-page button:focus-visible{outline:2px solid #8bc0ff;outline-offset:2px}
+@media(max-width:720px){.community-page .community-view-tabs{grid-template-columns:repeat(3,minmax(180px,1fr));overflow-x:auto}.community-page .community-view-tabs button{min-height:64px;padding:10px 12px}.community-page .community-topic-nav{margin-right:-2px}.community-page{background:#101d31}}
