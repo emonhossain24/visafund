@@ -29,7 +29,7 @@ try{
  await db.prepare("DELETE FROM banking_hub_content WHERE id=?").bind(hubId).run();
  ok(!(await db.prepare("SELECT id FROM banking_hub_content WHERE id=?").bind(hubId).first()));
 
- for(const id of ['author','reader'])await db.prepare("INSERT INTO platform_users(id,name,email,status,created,last_seen,preferences) VALUES(?,?,?,'active',?,?, '{}')").bind(id,id,id+'@example.test',new Date().toISOString(),new Date().toISOString()).run();
+ for(const id of ['author','reader','admin'])await db.prepare("INSERT INTO platform_users(id,name,email,status,created,last_seen,preferences) VALUES(?,?,?,'active',?,?, '{}')").bind(id,id,id+'@example.test',new Date().toISOString(),new Date().toISOString()).run();
  const stamp=new Date().toISOString(),past=new Date(Date.now()-25*3600000).toISOString(),future=new Date(Date.now()+24*3600000).toISOString();
  const post=crypto.randomUUID(),expiredPost=crypto.randomUUID();
  await db.prepare("INSERT INTO community_posts(id,author_id,category,body,status,created_at,updated_at,expires_at) VALUES(?,?, 'General Discussion','active post','active',?,?,?)").bind(post,'author',stamp,stamp,future).run();
