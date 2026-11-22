@@ -39,6 +39,7 @@ export async function POST(request:Request){
    await rateLimit(user.userId,'banking-query-helpful',60);
    const result=await db().prepare(`INSERT OR IGNORE INTO banking_query_helpful(query_id,user_id,created_at)
      SELECT id,?,? FROM banking_queries WHERE id=? AND status='published'`).bind(user.userId,now(),id).run();
+   if(result.meta.changes)await db().prepare('UPDATE banking_queries SET helpful_count=helpful_count+1 WHERE id=?').bind(id).run();
    const row=await db().prepare('SELECT helpful_count FROM banking_queries WHERE id=? AND status=\'published\'').bind(id).first() as {helpful_count:number}|null;
    if(!row)throw new HttpError(404,'Query not found');
    return json({ok:true,helpfulCount:row.helpful_count,added:Boolean(result.meta.changes)});
