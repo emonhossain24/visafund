@@ -18,6 +18,28 @@ try{
  for(const statement of migration.split(';').map(s=>s.trim()).filter(Boolean))await db.prepare(statement).run();
  const hubMigration=await readFile('drizzle/0009_banking_hub_content.sql','utf8');
  for(const statement of hubMigration.split(';').map(s=>s.trim()).filter(Boolean))await db.prepare(statement).run();
+ const bankingQueriesMigration=await readFile('drizzle/0010_banking_queries.sql','utf8');
+ for(const statement of bankingQueriesMigration.split(';').map(s=>s.trim()).filter(Boolean))await db.prepare(statement).run();
+ const queryId=crypto.randomUUID(),queryStamp=new Date().toISOString();
+ await db.prepare("INSERT INTO banking_queries(id,title,topic,question,answer,status,helpful_count,sort_order,created_by,created_at,updated_at) VALUES(?,?,?,?,?,'published',0,0,?,?,?)")
+  .bind(queryId,'Bank statement question','Bank Statement','Can I use a six-month bank statement?','Yes, check the destination-specific official requirements.', 'admin',queryStamp,queryStamp).run();
+ const visibleQuery=await db.prepare("SELECT title,question,answer,status,helpful_count FROM banking_queries WHERE id=?").bind(queryId).first() as {title:string;question:string;answer:string;status:string;helpful_count:number}|null;
+ ok(visibleQuery?.title==='Bank statement question'&&visibleQuery.question.startsWith('Can I use')&&visibleQuery.answer.startsWith('Yes')&&visibleQuery.status==='published'&&visibleQuery.helpful_count===0);
+ await db.prepare("INSERT OR IGNORE INTO banking_query_helpful(query_id,user_id,created_at) SELECT id,?,? FROM banking_queries WHERE id=? AND status='published'").bind('reader',queryStamp,queryId).run();
+ await db.prepare("UPDATE banking_queries SET helpful_count=helpful_count+1 WHERE id=?").bind(queryId).run();
+ const vote=await db.prepare("SELECT helpful_count FROM banking_queries WHERE id=?").bind(queryId).first() as {helpful_count:number}|null;
+ ok(vote?.helpful_count===1);
+ await db.prepare("UPDATE banking_queries SET title=?,question=?,answer=?,updated_at=? WHERE id=?").bind('Updated question','Updated question text','Updated answer text',new Date().toISOString(),queryId).run();
+ const updatedQuery=await db.prepare("SELECT title,question,answer FROM banking_queries WHERE id=?").bind(queryId).first() as {title:string;question:string;answer:string}|null;
+ ok(updatedQuery?.title==='Updated question'&&updatedQuery.question==='Updated question text'&&updatedQuery.answer==='Updated answer text');
+ await db.prepare("UPDATE banking_queries SET status='draft' WHERE id=?").bind(queryId).run();
+ const publicQueries=await db.prepare("SELECT id FROM banking_queries WHERE id=? AND status='published'").bind(queryId).first();
+ const adminQueries=await db.prepare("SELECT id FROM banking_queries WHERE id=?").bind(queryId).first();
+ ok(!publicQueries&&!!adminQueries);
+ // Banking Queries have no expiry column and are not part of the community cleanup job.
+ ok(!/expires|expiry/i.test(bankingQueriesMigration));
+ await db.prepare("DELETE FROM banking_queries WHERE id=?").bind(queryId).run();
+ ok(!(await db.prepare("SELECT id FROM banking_queries WHERE id=?").bind(queryId).first()));
  const hubId=crypto.randomUUID(),hubStamp=new Date().toISOString();
  await db.prepare("INSERT INTO banking_hub_content(id,kind,title,summary,body,category,country,platform,meeting_url,venue,starts_at,timezone,duration_minutes,fee_amount,fee_currency,status,access_level,sort_order,created_by,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)")
   .bind(hubId,'event','Student workshop','Open workshop','Event details','IELTS','','Google Meet','https://meet.google.com/example','Online',new Date(Date.now()+86400000).toISOString(),'Asia/Dhaka',60,null,'BDT','published','public',0,'admin',hubStamp,hubStamp).run();
