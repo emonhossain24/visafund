@@ -16,11 +16,10 @@ async function record(database: D1Database, actor: string, action: string, targe
 
 export async function readCommunityAdmin(database: D1Database, mode: string, search = '', status = 'all') {
   const q = '%' + search.trim().slice(0, 80) + '%';
-  const stamp = timestamp();
   if (mode === 'overview') {
     const [posts, comments, groups, reports, restrictedUsers, members] = await Promise.all([
-      database.prepare("SELECT COUNT(*) AS count FROM community_posts WHERE expires_at>?").bind(stamp).first<{count:number}>(),
-      database.prepare("SELECT COUNT(*) AS count FROM community_comments WHERE expires_at>?").bind(stamp).first<{count:number}>(),
+      database.prepare("SELECT COUNT(*) AS count FROM community_posts").first<{count:number}>(),
+      database.prepare("SELECT COUNT(*) AS count FROM community_comments").first<{count:number}>(),
       database.prepare("SELECT COUNT(*) AS count FROM community_groups WHERE status='active'").first<{count:number}>(),
       database.prepare("SELECT COUNT(*) AS count FROM community_reports WHERE status='open'").first<{count:number}>(),
       database.prepare("SELECT COUNT(*) AS count FROM community_user_controls WHERE status<>'active' OR posting_disabled=1 OR commenting_disabled=1").first<{count:number}>(),
@@ -32,14 +31,14 @@ export async function readCommunityAdmin(database: D1Database, mode: string, sea
     const rows = await database.prepare(
       "SELECT p.id,p.author_id,p.group_id,p.category,p.body,p.status,p.created_at,p.updated_at,p.expires_at," +
       "u.name AS author_name,pi.id AS author_profile_id,g.name AS group_name," +
-      "(SELECT COUNT(*) FROM community_comments c WHERE c.post_id=p.id AND c.expires_at>?) AS comment_count," +
+      "(SELECT COUNT(*) FROM community_comments c WHERE c.post_id=p.id) AS comment_count," +
       "(SELECT COUNT(*) FROM community_reactions r WHERE r.post_id=p.id AND r.reaction_type='like') AS like_count," +
       "(SELECT COUNT(*) FROM community_reactions r WHERE r.post_id=p.id AND r.reaction_type='helpful') AS helpful_count " +
       "FROM community_posts p JOIN platform_users u ON u.id=p.author_id " +
       "LEFT JOIN platform_profile_ids pi ON pi.owner=p.author_id LEFT JOIN community_groups g ON g.id=p.group_id " +
-      "WHERE p.expires_at>? AND (?='all' OR p.status=?) AND (p.body LIKE ? OR u.name LIKE ? OR CAST(pi.id AS TEXT) LIKE ?) " +
+      "WHERE (?='all' OR p.status=?) AND (p.body LIKE ? OR u.name LIKE ? OR CAST(pi.id AS TEXT) LIKE ?) " +
       "ORDER BY p.created_at DESC LIMIT 100"
-    ).bind(stamp, stamp, status, status, q, q, q).all();
+    ).bind(status, status, q, q, q).all();
     return { posts: rows.results };
   }
   if (mode === 'comments') {
@@ -48,9 +47,9 @@ export async function readCommunityAdmin(database: D1Database, mode: string, sea
       "u.name AS author_name,pi.id AS author_profile_id,p.body AS post_body,p.status AS post_status " +
       "FROM community_comments c JOIN community_posts p ON p.id=c.post_id " +
       "JOIN platform_users u ON u.id=c.author_id LEFT JOIN platform_profile_ids pi ON pi.owner=c.author_id " +
-      "WHERE c.expires_at>? AND p.expires_at>? AND (?='all' OR p.status=?) " +
+      "WHERE (?='all' OR p.status=?) " +
       "AND (c.body LIKE ? OR u.name LIKE ? OR CAST(pi.id AS TEXT) LIKE ?) ORDER BY c.created_at DESC LIMIT 150"
-    ).bind(stamp, stamp, status, status, q, q, q).all();
+    ).bind(status, status, q, q, q).all();
     return { comments: rows.results };
   }
   if (mode === 'groups') {
@@ -58,9 +57,9 @@ export async function readCommunityAdmin(database: D1Database, mode: string, sea
       "SELECT g.id,g.slug,g.name,g.description,g.join_mode,g.status,g.created_at,g.updated_at," +
       "(SELECT COUNT(*) FROM community_group_members m WHERE m.group_id=g.id AND m.status='active') AS member_count," +
       "(SELECT COUNT(*) FROM community_group_members m WHERE m.group_id=g.id AND m.status='pending') AS pending_count," +
-      "(SELECT COUNT(*) FROM community_posts p WHERE p.group_id=g.id AND p.expires_at>?) AS post_count " +
+      "(SELECT COUNT(*) FROM community_posts p WHERE p.group_id=g.id) AS post_count " +
       "FROM community_groups g WHERE (?='all' OR g.status=?) AND (g.name LIKE ? OR g.description LIKE ?) ORDER BY g.name LIMIT 100"
-    ).bind(stamp, status, status, q, q).all();
+    ).bind(status, status, q, q).all();
     return { groups: rows.results };
   }
   if (mode === 'members') {
@@ -89,12 +88,12 @@ export async function readCommunityAdmin(database: D1Database, mode: string, sea
     const rows = await database.prepare(
       "SELECT r.id,r.reason,r.status,r.created_at,r.reviewed_by,r.reviewed_at,r.post_id,r.comment_id," +
       "u.name AS reporter_name,pi.id AS reporter_profile_id," +
-      "CASE WHEN p.expires_at>? THEN p.body WHEN c.expires_at>? THEN c.body ELSE NULL END AS content_preview " +
+      "CASE WHEN p.id IS NOT NULL THEN p.body WHEN c.id IS NOT NULL THEN c.body ELSE NULL END AS content_preview " +
       "FROM community_reports r JOIN platform_users u ON u.id=r.reporter_id " +
       "LEFT JOIN platform_profile_ids pi ON pi.owner=r.reporter_id " +
       "LEFT JOIN community_posts p ON p.id=r.post_id LEFT JOIN community_comments c ON c.id=r.comment_id " +
       "WHERE (?='all' OR r.status=?) AND (r.reason LIKE ? OR u.name LIKE ?) ORDER BY r.created_at DESC LIMIT 150"
-    ).bind(stamp, stamp, status, status, q, q).all();
+    ).bind(status, status, q, q).all();
     return { reports: rows.results };
   }
   if (mode === 'logs') {
@@ -176,9 +175,9 @@ export async function moderateCommunity(database: D1Database, actor: string, raw
     const postId = z.string().uuid().parse(input.postId);
     const body = moderationText(input.body || '', 5000);
     const category = z.string().trim().min(1).max(60).parse(input.category || 'General Discussion');
-    const result = await database.prepare('UPDATE community_posts SET body=?,category=?,updated_at=? WHERE id=? AND expires_at>?')
-      .bind(body, category, stamp, postId, stamp).run();
-    if (!result.meta.changes) throw Object.assign(new Error('Post not found or expired.'), { status: 404 });
+    const result = await database.prepare('UPDATE community_posts SET body=?,category=?,updated_at=? WHERE id=?')
+      .bind(body, category, stamp, postId).run();
+    if (!result.meta.changes) throw Object.assign(new Error('Post not found.'), { status: 404 });
     await record(database, actor, 'post.edit', postId, null, reason);
     return { ok: true };
   }

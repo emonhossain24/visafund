@@ -12,11 +12,34 @@ let checks=0;
 const ok=(value:unknown)=>{assert.ok(value);checks++};
 try{
  const db=await mf.getD1Database('DB');
+ await db.prepare("CREATE TABLE platform_roles(owner TEXT NOT NULL,role TEXT NOT NULL)").run();
  await db.prepare("CREATE TABLE platform_users(id TEXT PRIMARY KEY,name TEXT NOT NULL,email TEXT NOT NULL,status TEXT NOT NULL,created TEXT NOT NULL,last_seen TEXT NOT NULL,preferences TEXT NOT NULL)").run();
  const migration=await readFile('drizzle/0008_banking_feed.sql','utf8');
  for(const statement of migration.split(';').map(s=>s.trim()).filter(Boolean))await db.prepare(statement).run();
  const hubMigration=await readFile('drizzle/0009_banking_hub_content.sql','utf8');
  for(const statement of hubMigration.split(';').map(s=>s.trim()).filter(Boolean))await db.prepare(statement).run();
+ const bankingQueriesMigration=await readFile('drizzle/0010_banking_queries.sql','utf8');
+ for(const statement of bankingQueriesMigration.split(';').map(s=>s.trim()).filter(Boolean))await db.prepare(statement).run();
+ const queryId=crypto.randomUUID(),queryStamp=new Date().toISOString();
+ await db.prepare("INSERT INTO banking_queries(id,title,topic,question,answer,status,helpful_count,sort_order,created_by,created_at,updated_at) VALUES(?,?,?,?,?,'published',0,0,?,?,?)")
+  .bind(queryId,'Bank statement question','Bank Statement','Can I use a six-month bank statement?','Yes, check the destination-specific official requirements.', 'admin',queryStamp,queryStamp).run();
+ const visibleQuery=await db.prepare("SELECT title,question,answer,status,helpful_count FROM banking_queries WHERE id=?").bind(queryId).first() as {title:string;question:string;answer:string;status:string;helpful_count:number}|null;
+ ok(visibleQuery?.title==='Bank statement question'&&visibleQuery.question.startsWith('Can I use')&&visibleQuery.answer.startsWith('Yes')&&visibleQuery.status==='published'&&visibleQuery.helpful_count===0);
+ await db.prepare("INSERT OR IGNORE INTO banking_query_helpful(query_id,user_id,created_at) SELECT id,?,? FROM banking_queries WHERE id=? AND status='published'").bind('reader',queryStamp,queryId).run();
+ await db.prepare("UPDATE banking_queries SET helpful_count=helpful_count+1 WHERE id=?").bind(queryId).run();
+ const vote=await db.prepare("SELECT helpful_count FROM banking_queries WHERE id=?").bind(queryId).first() as {helpful_count:number}|null;
+ ok(vote?.helpful_count===1);
+ await db.prepare("UPDATE banking_queries SET title=?,question=?,answer=?,updated_at=? WHERE id=?").bind('Updated question','Updated question text','Updated answer text',new Date().toISOString(),queryId).run();
+ const updatedQuery=await db.prepare("SELECT title,question,answer FROM banking_queries WHERE id=?").bind(queryId).first() as {title:string;question:string;answer:string}|null;
+ ok(updatedQuery?.title==='Updated question'&&updatedQuery.question==='Updated question text'&&updatedQuery.answer==='Updated answer text');
+ await db.prepare("UPDATE banking_queries SET status='draft' WHERE id=?").bind(queryId).run();
+ const publicQueries=await db.prepare("SELECT id FROM banking_queries WHERE id=? AND status='published'").bind(queryId).first();
+ const adminQueries=await db.prepare("SELECT id FROM banking_queries WHERE id=?").bind(queryId).first();
+ ok(!publicQueries&&!!adminQueries);
+ // Banking Queries have no expiry column and are not part of the community cleanup job.
+ ok(!/expires|expiry/i.test(bankingQueriesMigration));
+ await db.prepare("DELETE FROM banking_queries WHERE id=?").bind(queryId).run();
+ ok(!(await db.prepare("SELECT id FROM banking_queries WHERE id=?").bind(queryId).first()));
  const hubId=crypto.randomUUID(),hubStamp=new Date().toISOString();
  await db.prepare("INSERT INTO banking_hub_content(id,kind,title,summary,body,category,country,platform,meeting_url,venue,starts_at,timezone,duration_minutes,fee_amount,fee_currency,status,access_level,sort_order,created_by,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)")
   .bind(hubId,'event','Student workshop','Open workshop','Event details','IELTS','','Google Meet','https://meet.google.com/example','Online',new Date(Date.now()+86400000).toISOString(),'Asia/Dhaka',60,null,'BDT','published','public',0,'admin',hubStamp,hubStamp).run();
@@ -28,7 +51,7 @@ try{
  await db.prepare("DELETE FROM banking_hub_content WHERE id=?").bind(hubId).run();
  ok(!(await db.prepare("SELECT id FROM banking_hub_content WHERE id=?").bind(hubId).first()));
 
- for(const id of ['author','reader'])await db.prepare("INSERT INTO platform_users(id,name,email,status,created,last_seen,preferences) VALUES(?,?,?,'active',?,?, '{}')").bind(id,id,id+'@example.test',new Date().toISOString(),new Date().toISOString()).run();
+ for(const id of ['author','reader','admin'])await db.prepare("INSERT INTO platform_users(id,name,email,status,created,last_seen,preferences) VALUES(?,?,?,'active',?,?, '{}')").bind(id,id,id+'@example.test',new Date().toISOString(),new Date().toISOString()).run();
  const stamp=new Date().toISOString(),past=new Date(Date.now()-25*3600000).toISOString(),future=new Date(Date.now()+24*3600000).toISOString();
  const post=crypto.randomUUID(),expiredPost=crypto.randomUUID();
  await db.prepare("INSERT INTO community_posts(id,author_id,category,body,status,created_at,updated_at,expires_at) VALUES(?,?, 'General Discussion','active post','active',?,?,?)").bind(post,'author',stamp,stamp,future).run();
@@ -39,7 +62,16 @@ try{
  await db.prepare("INSERT INTO community_comments(id,post_id,author_id,body,created_at,updated_at,expires_at) VALUES(?,?,?,'expired reply',?,?,?)").bind(expiredReply,post,'reader',stamp,stamp,past).run();
  await db.prepare('INSERT INTO community_saved_posts(user_id,post_id,created_at) VALUES(?,?,?)').bind('reader',expiredPost,stamp).run();
  await db.prepare("INSERT INTO community_reactions(post_id,user_id,reaction_type,created_at) VALUES(?,?,'like',?)").bind(expiredPost,'reader',stamp).run();
+ // Admin-owned posts/comments and posts containing an admin comment must survive automatic cleanup.
+ await db.prepare("INSERT INTO platform_roles(owner,role) VALUES('admin','SUPER_ADMIN')").run();
+ const adminPost=crypto.randomUUID(),adminCommentPost=crypto.randomUUID(),adminComment=crypto.randomUUID();
+ await db.prepare("INSERT INTO community_posts(id,author_id,category,body,status,created_at,updated_at,expires_at) VALUES(?,?, 'General Discussion','admin post','active',?,?,?)").bind(adminPost,'admin',past,past,past).run();
+ await db.prepare("INSERT INTO community_posts(id,author_id,category,body,status,created_at,updated_at,expires_at) VALUES(?,?, 'General Discussion','member post with admin comment','active',?,?,?)").bind(adminCommentPost,'author',past,past,past).run();
+ await db.prepare("INSERT INTO community_comments(id,post_id,author_id,body,created_at,updated_at,expires_at) VALUES(?,?,?,'admin comment',?,?,?)").bind(adminComment,adminCommentPost,'admin',past,past,past).run();
  const result=await cleanupCommunity(db);
+ ok(!!await db.prepare('SELECT id FROM community_posts WHERE id=?').bind(adminPost).first());
+ ok(!!await db.prepare('SELECT id FROM community_comments WHERE id=?').bind(adminComment).first());
+ ok(!!await db.prepare('SELECT id FROM community_posts WHERE id=?').bind(adminCommentPost).first());
  ok(result.deletedComments>=2);
  ok(result.deletedPosts>=0);
  ok(!(await db.prepare('SELECT id FROM community_posts WHERE id=?').bind(expiredPost).first()));
