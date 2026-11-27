@@ -44,8 +44,14 @@ async function ensureBankingQueries(){
   created_at TEXT NOT NULL,
   PRIMARY KEY(query_id,user_id)
  )`).run();
+ const helpfulColumns=[['query_id',"TEXT NOT NULL DEFAULT ''"],['user_id',"TEXT NOT NULL DEFAULT ''"],['created_at',"TEXT NOT NULL DEFAULT ''"]] as const;
+ const existingHelpful=await database.prepare('PRAGMA table_info(banking_query_helpful)').all<{name:string}>();
+ const helpfulNames=new Set((existingHelpful.results||[]).map(column=>column.name));
+ for(const [name,definition] of helpfulColumns){
+  if(!helpfulNames.has(name))await database.prepare(`ALTER TABLE banking_query_helpful ADD COLUMN ${name} ${definition}`).run();
+ }
  await database.prepare('CREATE INDEX IF NOT EXISTS banking_query_helpful_user ON banking_query_helpful(user_id,created_at)').run();
- // Keep the audit dependency available even if the Live D1 migration history is incomplete.
+ // Repair partial audit tables too; a failed audit schema must not break query reads.
  await database.prepare(`CREATE TABLE IF NOT EXISTS platform_audit (
   id TEXT PRIMARY KEY NOT NULL,
   actor TEXT NOT NULL,
@@ -54,6 +60,12 @@ async function ensureBankingQueries(){
   reason TEXT NOT NULL,
   created TEXT NOT NULL
  )`).run();
+ const auditColumns=[['actor',"TEXT NOT NULL DEFAULT 'system'"],['target','TEXT'],['action',"TEXT NOT NULL DEFAULT 'unknown'"],['reason',"TEXT NOT NULL DEFAULT ''"],['created',"TEXT NOT NULL DEFAULT ''"]] as const;
+ const existingAudit=await database.prepare('PRAGMA table_info(platform_audit)').all<{name:string}>();
+ const auditNames=new Set((existingAudit.results||[]).map(column=>column.name));
+ for(const [name,definition] of auditColumns){
+  if(!auditNames.has(name))await database.prepare(`ALTER TABLE platform_audit ADD COLUMN ${name} ${definition}`).run();
+ }
  await database.prepare('CREATE INDEX IF NOT EXISTS platform_audit_created ON platform_audit(created)').run();
  const stamp=now();
  const seeds=[
