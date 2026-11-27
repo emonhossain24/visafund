@@ -64,7 +64,7 @@ export async function GET(){
   const rows=await db().prepare(`SELECT q.id,q.title,q.topic,q.question,q.answer,q.status,q.helpful_count,q.sort_order,q.created_at,q.updated_at,
     CASE WHEN h.user_id IS NULL THEN 0 ELSE 1 END AS helpful_by_me
     FROM banking_queries q LEFT JOIN banking_query_helpful h ON h.query_id=q.id AND h.user_id=?
-    ${isAdmin?'':'WHERE q.status=\\'published\\''}
+    ${isAdmin?'':"WHERE q.status='published'"}
     ORDER BY q.sort_order,q.updated_at DESC`).bind(user.userId).all();
   return json({ok:true,isAdmin,items:rows.results});
  }catch(error){return fail(error)}
