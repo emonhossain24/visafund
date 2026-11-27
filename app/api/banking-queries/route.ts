@@ -48,7 +48,7 @@ async function ensureBankingQueries(){
  // deposit-account wording; leave any administrator-edited answer untouched.
  await database.prepare(`UPDATE banking_queries SET
   title=?, question=?, answer=?, updated_at=?
-  WHERE id=? AND (answer LIKE '%FDR%' OR answer LIKE '%SDR%' OR answer LIKE '%HDR%')`)
+  WHERE id=? AND answer LIKE '%পরিকল্পনার জন্য প্রায় €10,500 বা তার বেশি সমপরিমাণ অর্থের লক্ষ্য রাখতে পারেন.%'`)
   .bind('ইতালির ভিসার জন্য কত টাকা প্রয়োজন?','ব্যাংক অ্যাকাউন্টে কত টাকা রাখা উচিত?','পরিকল্পনার জন্য প্রায় €10,500 বা তার বেশি সমপরিমাণ অর্থ প্রস্তুত রাখতে পারেন। এটি নির্দিষ্ট সরকারি ন্যূনতম অঙ্ক নয়—সর্বশেষ দূতাবাসের নির্দেশনা যাচাই করবেন। Savings Account-এ পর্যাপ্ত Liquid Money রাখুন এবং অর্থের বৈধ উৎসের প্রমাণ রাখুন। ধার করা বা সাময়িকভাবে জোগাড় করা টাকা দেখাবেন না।',stamp,'9f8c1a20-4c7d-4b31-9e62-11a000000004').run();
 }
 const schema=z.object({
