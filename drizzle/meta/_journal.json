@@ -85,6 +85,13 @@
       "when": 1795737600000,
       "tag": "0011_italy_bank_queries",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "6",
+      "when": 1795777080000,
+      "tag": "0012_banking_queries_cleanup",
+      "breakpoints": true
     }
   ]
 }
