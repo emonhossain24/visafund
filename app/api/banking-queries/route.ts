@@ -19,7 +19,6 @@ export async function GET(){
  try{
   const user=await identity();
   const isAdmin=await superAdmin().then(()=>true).catch(()=>false);
-  if(isAdmin)await requireAdminMFA();
   const rows=await db().prepare(`SELECT q.id,q.title,q.topic,q.question,q.answer,q.status,q.helpful_count,q.sort_order,q.created_at,q.updated_at,
     CASE WHEN h.user_id IS NULL THEN 0 ELSE 1 END AS helpful_by_me
     FROM banking_queries q LEFT JOIN banking_query_helpful h ON h.query_id=q.id AND h.user_id=?
