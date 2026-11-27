@@ -8,7 +8,7 @@ import BankingFeed from '@/app/banking-feed';
 import PublicSite from '@/app/public-site';
 import AdminSite from '@/app/admin-site';
 import Registration from '@/app/registration';
-import {getAppUser as getChatGPTUser,authConfigured,verifiedAdminMFA,nativeIdentityEnabled} from '@/lib/supabase-auth';
+import {getAppUser as getChatGPTUser,authConfigured,nativeIdentityEnabled} from '@/lib/supabase-auth';
 import {activeMember,isProvisionedAdmin,memberFor} from '@/lib/platform';
 import {profileIdForOwner} from '@/lib/profile-id';
 import {db} from '@/lib/server';
@@ -23,9 +23,9 @@ export default async function Page({params,searchParams}:{params:Promise<{slug?:
  if(route==='login'&&query.step==='mfa'&&!user)redirect('/login');
  if(route==='admin/login')redirect('/login'+(query.step==='mfa'?'?step=mfa':''));
  if(!authConfigured()&&user&&['login','register','admin/login'].includes(route)){try{await activeMember(user)}catch{return <Registration nativeIdentity={nativeIdentityEnabled()} role={role} mode="register" signedIn name={user.displayName} {...(await restrictedProps(user))} configured={false}/>;}redirect('/dashboard');}
- if(route==='login'&&authConfigured()&&user){try{await activeMember(user)}catch{return <Registration nativeIdentity={nativeIdentityEnabled()} role={role} mode="register" signedIn name={user.displayName} {...(await restrictedProps(user))} configured/>}if(await isProvisionedAdmin(user.userId)){if(await verifiedAdminMFA())redirect('/admin/dashboard');return <Registration nativeIdentity={nativeIdentityEnabled()} role={role} mode="login/mfa" signedIn name={user.displayName} configured/>}redirect('/dashboard')}
+ if(route==='login'&&authConfigured()&&user){try{await activeMember(user)}catch{return <Registration nativeIdentity={nativeIdentityEnabled()} role={role} mode="register" signedIn name={user.displayName} {...(await restrictedProps(user))} configured/>}if(await isProvisionedAdmin(user.userId))redirect('/admin/dashboard');redirect('/dashboard')}
  if(['register','login','admin/login','forgot-password','auth/reset-password','auth/link'].includes(route))return <Registration nativeIdentity={nativeIdentityEnabled()} role={role} mode={route==='login'&&query.step==='mfa'?'login/mfa':route} signedIn={!!user} name={user?.displayName||''} configured={authConfigured()}/>;
- if(route==='admin'||route.startsWith('admin/')){let allowed=false;if(user&&await isProvisionedAdmin(user.userId)){try{await activeMember(user);allowed=true}catch{}}if(allowed&&(!authConfigured()||!await verifiedAdminMFA())){if(authConfigured())redirect('/login?step=mfa');allowed=false}return <AdminSite route={route} authorized={allowed}/>;}
+ if(route==='admin'||route.startsWith('admin/')){let allowed=false;if(user&&await isProvisionedAdmin(user.userId)){try{await activeMember(user);allowed=true}catch{}}/* Provisioned Super Admin access requires normal sign-in only; no MFA challenge. */return <AdminSite route={route} authorized={allowed}/>;}
  const publicPages=['home','features','how-it-works','supported-countries','requirements','public-comparison','calculator','about','help','faq','contact','privacy','terms'];
  if(publicPages.includes(route))return <PublicSite destinations={await activeDestinations()} pages={await publishedPages()} role={role} route={route} signedIn={!!user} rules={['supported-countries','requirements','public-comparison'].includes(route)?await publicRules():[]}/>;
  if(!user)redirect('/login');
