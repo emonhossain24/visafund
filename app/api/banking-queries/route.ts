@@ -23,6 +23,20 @@ async function ensureBankingQueries(){
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL
  )`).run();
+ // A table may already exist from a partially applied older migration. CREATE IF
+ // NOT EXISTS does not repair it, so add any missing non-key columns before indexes.
+ const queryColumns=[
+  ['title',"TEXT NOT NULL DEFAULT ''"],['topic',"TEXT NOT NULL DEFAULT ''"],
+  ['question',"TEXT NOT NULL DEFAULT ''"],['answer',"TEXT NOT NULL DEFAULT ''"],
+  ['status',"TEXT NOT NULL DEFAULT 'published'"],['helpful_count','INTEGER NOT NULL DEFAULT 0'],
+  ['sort_order','INTEGER NOT NULL DEFAULT 0'],['created_by',"TEXT NOT NULL DEFAULT 'system'"],
+  ['created_at',"TEXT NOT NULL DEFAULT ''"],['updated_at',"TEXT NOT NULL DEFAULT ''"]
+ ] as const;
+ const existingQueryColumns=await database.prepare('PRAGMA table_info(banking_queries)').all<{name:string}>();
+ const queryColumnNames=new Set((existingQueryColumns.results||[]).map(column=>column.name));
+ for(const [name,definition] of queryColumns){
+  if(!queryColumnNames.has(name))await database.prepare(`ALTER TABLE banking_queries ADD COLUMN ${name} ${definition}`).run();
+ }
  await database.prepare('CREATE INDEX IF NOT EXISTS banking_queries_published_sort ON banking_queries(status,sort_order,updated_at)').run();
  await database.prepare(`CREATE TABLE IF NOT EXISTS banking_query_helpful (
   query_id TEXT NOT NULL REFERENCES banking_queries(id) ON DELETE CASCADE,
