@@ -4,6 +4,47 @@ import { superAdmin, requireAdminMFA } from '@/lib/platform';
 
 export const dynamic='force-dynamic';
 const json=(value:unknown,status=200)=>Response.json(value,{status,headers:{'Cache-Control':'no-store'}});
+
+// Self-heal the Banking Queries schema and seed the initial Italy questions.
+// This is intentionally idempotent: it works even when a D1 migration was not
+// applied, and it never overwrites questions an administrator has edited.
+async function ensureBankingQueries(){
+ const database=db();
+ await database.prepare(`CREATE TABLE IF NOT EXISTS banking_queries (
+  id TEXT PRIMARY KEY NOT NULL,
+  title TEXT NOT NULL,
+  topic TEXT NOT NULL DEFAULT '',
+  question TEXT NOT NULL,
+  answer TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'published' CHECK (status IN ('draft','published')),
+  helpful_count INTEGER NOT NULL DEFAULT 0,
+  sort_order INTEGER NOT NULL DEFAULT 0,
+  created_by TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+ )`).run();
+ await database.prepare('CREATE INDEX IF NOT EXISTS banking_queries_published_sort ON banking_queries(status,sort_order,updated_at)').run();
+ await database.prepare(`CREATE TABLE IF NOT EXISTS banking_query_helpful (
+  query_id TEXT NOT NULL REFERENCES banking_queries(id) ON DELETE CASCADE,
+  user_id TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  PRIMARY KEY(query_id,user_id)
+ )`).run();
+ await database.prepare('CREATE INDEX IF NOT EXISTS banking_query_helpful_user ON banking_query_helpful(user_id,created_at)').run();
+ const stamp=now();
+ const seeds=[
+  ['9f8c1a20-4c7d-4b31-9e62-11a000000001','ইতালির স্টুডেন্ট ভিসার জন্য কত মাসের ব্যাংক স্টেটমেন্ট প্রয়োজন?','Bank Statement','ইতালির স্টুডেন্ট ভিসার আবেদনের জন্য কত মাসের ব্যাংক স্টেটমেন্ট জমা দিতে হয়?','আবেদনকারী (Applicant) ও আর্থিক স্পন্সরের (Sponsor) গত ১২ মাসের ব্যাংক স্টেটমেন্ট প্রস্তুত রাখুন। এতে নিয়মিত লেনদেন, বর্তমান ব্যালেন্স এবং অর্থের উৎস বোঝানো সহজ হয়। জমা দেওয়ার আগে সংশ্লিষ্ট ইতালীয় দূতাবাস বা ভিসা সেন্টারের সর্বশেষ চেকলিস্ট যাচাই করুন।',10],
+  ['9f8c1a20-4c7d-4b31-9e62-11a000000002','ইতালির স্টুডেন্ট ভিসার জন্য কার কার ব্যাংক স্টেটমেন্ট প্রয়োজন?','Bank Statement','শুধু স্পন্সরের, নাকি আবেদনকারীর নিজের ব্যাংক স্টেটমেন্টও প্রয়োজন?','Applicant ও Sponsor—দুজনের ব্যাংক স্টেটমেন্ট প্রস্তুত রাখুন। স্পন্সর খরচ বহন করলে তাঁর আয়ের প্রমাণ, পরিচয়পত্র, আবেদনকারীর সঙ্গে সম্পর্কের প্রমাণ এবং প্রয়োজনীয় sponsorship/consent documents-ও প্রস্তুত রাখুন। চূড়ান্ত ডকুমেন্ট তালিকা দূতাবাসের নির্দেশনা অনুযায়ী মিলিয়ে নিন।',20],
+  ['9f8c1a20-4c7d-4b31-9e62-11a000000003','ইতালির স্টুডেন্ট ভিসার জন্য কোন ব্যাংকের অ্যাকাউন্ট ব্যবহার করা যাবে?','Bank Account','বাংলাদেশের নির্দিষ্ট কোনো ব্যাংকে অ্যাকাউন্ট থাকতে হবে, নাকি যেকোনো ব্যাংকের স্টেটমেন্ট দেওয়া যাবে?','বাংলাদেশ ব্যাংকের অনুমোদিত ও নিয়ন্ত্রণাধীন যেকোনো ব্যাংকের অ্যাকাউন্ট ব্যবহার করতে পারবেন। নির্দিষ্ট কোনো ব্যাংক বাধ্যতামূলক—এমন সাধারণ নিয়ম নেই। ব্যাংক স্টেটমেন্ট আসল, যাচাইযোগ্য এবং প্রয়োজনীয় তথ্যসহ হতে হবে। সর্বশেষ দূতাবাসের নির্দেশনা যাচাই করুন।',30],
+  ['9f8c1a20-4c7d-4b31-9e62-11a000000004','ইতালির স্টুডেন্ট ভিসার জন্য ব্যাংক অ্যাকাউন্টে কত টাকা রাখা উচিত?','Proof of Funds','Applicant বা Sponsor-এর ব্যাংক অ্যাকাউন্টে কত টাকা রাখা ভালো?','পরিকল্পনার জন্য প্রায় €10,500 বা তার বেশি সমপরিমাণ অর্থের লক্ষ্য রাখতে পারেন। এটি দূতাবাসের নির্দিষ্ট বা স্থায়ী ন্যূনতম অঙ্ক নয়; প্রয়োজনীয় অর্থ শিক্ষাবর্ষ ও সর্বশেষ নির্দেশনা অনুযায়ী পরিবর্তিত হতে পারে। Savings Account-এ পর্যাপ্ত Liquid Money রাখুন, যাতে প্রয়োজন হলে সহজে ব্যবহার করা যায়। শুধু FDR বা SDR-এর ওপর নির্ভর করবেন না। অর্থের উৎস পরিষ্কার ও প্রমাণযোগ্য রাখুন; ধার করা বা সাময়িকভাবে জোগাড় করা টাকা দেখাবেন না। হঠাৎ বড় অঙ্ক জমা হলে তার বৈধ উৎসের কাগজপত্র প্রস্তুত রাখুন।',40]
+ ] as const;
+ for(const [id,title,topic,question,answer,sortOrder] of seeds){
+  await database.prepare(`INSERT OR IGNORE INTO banking_queries
+   (id,title,topic,question,answer,status,helpful_count,sort_order,created_by,created_at,updated_at)
+   VALUES(?,?,?,?,?,'published',0,?,'system',?,?)`)
+   .bind(id,title,topic,question,answer,sortOrder,stamp,stamp).run();
+ }
+}
 const schema=z.object({
  action:z.enum(['create','update','delete','helpful']),
  id:z.string().optional(),
@@ -18,11 +59,12 @@ const schema=z.object({
 export async function GET(){
  try{
   const user=await identity();
+  await ensureBankingQueries();
   const isAdmin=await superAdmin().then(()=>true).catch(()=>false);
   const rows=await db().prepare(`SELECT q.id,q.title,q.topic,q.question,q.answer,q.status,q.helpful_count,q.sort_order,q.created_at,q.updated_at,
     CASE WHEN h.user_id IS NULL THEN 0 ELSE 1 END AS helpful_by_me
     FROM banking_queries q LEFT JOIN banking_query_helpful h ON h.query_id=q.id AND h.user_id=?
-    ${isAdmin?'':'WHERE q.status=\'published\''}
+    ${isAdmin?'':'WHERE q.status=\\'published\\''}
     ORDER BY q.sort_order,q.updated_at DESC`).bind(user.userId).all();
   return json({ok:true,isAdmin,items:rows.results});
  }catch(error){return fail(error)}
@@ -33,13 +75,14 @@ export async function POST(request:Request){
   guard(request);
   const input=schema.parse(await readJson(request,36000));
   const user=await identity();
+  await ensureBankingQueries();
   if(input.action==='helpful'){
    const id=z.string().uuid().parse(input.id);
    await rateLimit(user.userId,'banking-query-helpful',60);
    const result=await db().prepare(`INSERT OR IGNORE INTO banking_query_helpful(query_id,user_id,created_at)
      SELECT id,?,? FROM banking_queries WHERE id=? AND status='published'`).bind(user.userId,now(),id).run();
    if(result.meta.changes)await db().prepare('UPDATE banking_queries SET helpful_count=helpful_count+1 WHERE id=?').bind(id).run();
-   const row=await db().prepare('SELECT helpful_count FROM banking_queries WHERE id=? AND status=\'published\'').bind(id).first() as {helpful_count:number}|null;
+   const row=await db().prepare("SELECT helpful_count FROM banking_queries WHERE id=? AND status='published'").bind(id).first<{helpful_count:number}|null>();
    if(!row)throw new HttpError(404,'Query not found');
    return json({ok:true,helpfulCount:row.helpful_count,added:Boolean(result.meta.changes)});
   }
