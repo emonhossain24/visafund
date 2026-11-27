@@ -1,5 +1,5 @@
 import type {ChatGPTUser} from '@/app/chatgpt-auth';
-import {getAppUser as getChatGPTUser,authConfigured,verifiedAdminMFA} from '@/lib/supabase-auth';
+import {getAppUser as getChatGPTUser} from '@/lib/supabase-auth';
 import { db,HttpError,now,uid } from '@/lib/server';
 import {banInactiveMember,wasAutomaticallyBanned} from '@/lib/inactivity';
 export type Member={id:string;name:string;email:string;status:'active'|'suspended'|'banned'|'deletion_pending'|'deleted';created:string;last_seen:string;terms_version:string|null;preferences:string};
@@ -16,5 +16,5 @@ export async function activeMember(user:ChatGPTUser){let member=await memberFor(
  if(!result)throw new HttpError(403,'Account access is restricted. Contact platform support.');
  return {...member,last_seen:t}}
 export async function superAdmin(){const user=await getChatGPTUser();if(!user)throw new HttpError(401,'Sign in first');if(!await isProvisionedAdmin(user.userId))throw new HttpError(403,'Super Admin access required');await activeMember(user);return user}
-export async function requireAdminMFA():Promise<void>{if(!authConfigured())throw new HttpError(503,'Admin access is locked: configure a verified MFA provider');if(!await verifiedAdminMFA())throw new HttpError(403,'Complete fresh MFA verification before accessing administration')}
+export async function requireAdminMFA():Promise<void>{/* Admin access is controlled by the provisioned SUPER_ADMIN role and authenticated provider session. MFA is intentionally not required. */}
 export function adminEvent(actor:string,target:string|null,action:string,reason:string){return db().prepare('INSERT INTO platform_audit(id,actor,target,action,reason,created) VALUES(?,?,?,?,?,?)').bind(uid(),actor,target,action,reason.slice(0,500),now())}
