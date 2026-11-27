@@ -31,6 +31,16 @@ async function ensureBankingQueries(){
   PRIMARY KEY(query_id,user_id)
  )`).run();
  await database.prepare('CREATE INDEX IF NOT EXISTS banking_query_helpful_user ON banking_query_helpful(user_id,created_at)').run();
+ // Keep the audit dependency available even if the Live D1 migration history is incomplete.
+ await database.prepare(`CREATE TABLE IF NOT EXISTS platform_audit (
+  id TEXT PRIMARY KEY NOT NULL,
+  actor TEXT NOT NULL,
+  target TEXT,
+  action TEXT NOT NULL,
+  reason TEXT NOT NULL,
+  created TEXT NOT NULL
+ )`).run();
+ await database.prepare('CREATE INDEX IF NOT EXISTS platform_audit_created ON platform_audit(created)').run();
  const stamp=now();
  const seeds=[
   ['9f8c1a20-4c7d-4b31-9e62-11a000000001','ইতালির স্টুডেন্ট ভিসার জন্য কত মাসের ব্যাংক স্টেটমেন্ট প্রয়োজন?','Bank Statement','ইতালির স্টুডেন্ট ভিসার আবেদনের জন্য কত মাসের ব্যাংক স্টেটমেন্ট জমা দিতে হয়?','আবেদনকারী (Applicant) ও আর্থিক স্পন্সরের (Sponsor) গত ১২ মাসের ব্যাংক স্টেটমেন্ট প্রস্তুত রাখুন। এতে নিয়মিত লেনদেন, বর্তমান ব্যালেন্স এবং অর্থের উৎস বোঝানো সহজ হয়। জমা দেওয়ার আগে সংশ্লিষ্ট ইতালীয় দূতাবাস বা ভিসা সেন্টারের সর্বশেষ চেকলিস্ট যাচাই করুন।',10],
